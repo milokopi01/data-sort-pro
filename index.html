@@ -1,0 +1,3211 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8" />
+  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbxETiJq_X5aHOvBTvkb7S52QRoF5Ot6od1AxdDopBCcY3PKcmBRGe6AAq-xEKe_8m8t_w/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Dashboard Data Sekolah | Murid, Guru & AKP</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Pustaka SheetJS untuk baca & eksport fail Excel (.xlsx / .csv) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Pustaka jsPDF + AutoTable untuk simpan senarai carian sebagai PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    :root {
+      --bg-canvas: #f3f6fb;
+      --bg-pure: #ffffff;
+      --bg-soft: #f8fafd;
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      --text-muted: #94a3b8;
+      --border-light: #e2e8f0;
+      --border-3d: #cbd5e1;
+      --primary: #1d4ed8;
+      --primary-dark: #1e3a8a;
+      --primary-soft: #eff6ff;
+      --murid: #059669;
+      --murid-dark: #047857;
+      --murid-soft: #ecfdf5;
+      --guru: #4f46e5;
+      --guru-dark: #3730a3;
+      --guru-soft: #eef2ff;
+      --akp: #d97706;
+      --akp-dark: #b45309;
+      --akp-soft: #fffbeb;
+      --danger: #dc2626;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --radius-sm: 10px;
+      --shadow-3d-card:
+        0 14px 30px -10px rgba(15, 23, 42, 0.10),
+        0 4px 12px -4px rgba(15, 23, 42, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.95);
+      --shadow-3d-hover:
+        0 20px 38px -12px rgba(29, 78, 216, 0.16),
+        0 8px 16px -6px rgba(15, 23, 42, 0.07),
+        inset 0 1px 0 rgba(255, 255, 255, 1);
+      --shadow-inset: inset 0 2px 6px rgba(15, 23, 42, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at 15% 10%, #ffffff 0%, #f3f6fb 55%, #e9eff8 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ================= KOMPONEN 3D KORPORAT PUTIH ================= */
+    .card-3d {
+      background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+      border: 1px solid rgba(226, 232, 240, 0.95);
+      border-bottom: 4px solid var(--border-3d);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-3d-card);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card-3d-interactive:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-3d-hover);
+    }
+
+    .btn-3d {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 18px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.14s ease;
+      user-select: none;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn-3d:active:not(:disabled) {
+      transform: translateY(3px);
+      border-bottom-width: 1px !important;
+      margin-bottom: 3px;
+    }
+
+    .btn-3d:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+      color: #ffffff;
+      border-bottom: 4px solid #1e3a8a;
+      box-shadow: 0 8px 18px -6px rgba(29, 78, 216, 0.45);
+    }
+
+    .btn-white {
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      color: var(--text-main);
+      border: 1px solid #dbe2ec;
+      border-bottom: 4px solid #cbd5e1;
+      box-shadow: 0 6px 14px -6px rgba(15, 23, 42, 0.12);
+    }
+
+    .btn-white:hover:not(:disabled) {
+      background: #ffffff;
+      border-color: #93c5fd;
+      color: var(--primary);
+    }
+
+    .btn-emerald {
+      background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      border-bottom: 4px solid #047857;
+      box-shadow: 0 8px 18px -6px rgba(5, 150, 105, 0.4);
+    }
+
+    .btn-sm {
+      padding: 8px 13px;
+      font-size: 0.82rem;
+      border-radius: var(--radius-sm);
+    }
+
+    .input-3d, .select-3d {
+      width: 100%;
+      padding: 12px 15px;
+      font-size: 0.94rem;
+      font-weight: 500;
+      color: var(--text-main);
+      background: #ffffff;
+      border: 1.5px solid #dbe2ec;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-inset);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-3d:focus, .select-3d:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12), var(--shadow-inset);
+    }
+
+    /* ================= SKRIN KUNCI KESELAMATAN (101010) ================= */
+    #lockScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: radial-gradient(circle at top, #ffffff 0%, #eef3fb 100%);
+    }
+
+    .lock-card {
+      width: 100%;
+      max-width: 410px;
+      padding: 36px 28px;
+      text-align: center;
+    }
+
+    .lock-emblem {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 18px;
+      border-radius: 22px;
+      background: linear-gradient(145deg, #ffffff, #e6eefb);
+      border: 1px solid #dbe4f3;
+      border-bottom: 4px solid #cbd5e1;
+      box-shadow: 0 12px 24px -8px rgba(29, 78, 216, 0.22);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+    }
+
+    .lock-card h1 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .lock-card p {
+      font-size: 0.88rem;
+      color: var(--text-sub);
+      margin-bottom: 24px;
+    }
+
+    .pin-wrap {
+      position: relative;
+      margin-bottom: 14px;
+    }
+
+    .pin-input {
+      text-align: center;
+      font-size: 1.35rem;
+      letter-spacing: 0.35em;
+      font-weight: 800;
+      padding-right: 44px;
+    }
+
+    .pin-toggle {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .error-msg {
+      color: var(--danger);
+      font-size: 0.84rem;
+      font-weight: 600;
+      min-height: 20px;
+      margin-bottom: 10px;
+    }
+
+    /* ================= SUSUN ATUR UTAMA ================= */
+    #appShell {
+      display: none;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 18px 18px 80px;
+    }
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 16px 22px;
+      margin-bottom: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: linear-gradient(145deg, #2563eb, #1e40af);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 18px -5px rgba(37, 99, 235, 0.45);
+      flex-shrink: 0;
+    }
+
+    .brand-text h2 {
+      font-size: 1.12rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+
+    .brand-text span {
+      font-size: 0.78rem;
+      color: var(--text-sub);
+      font-weight: 600;
+    }
+
+    .nav-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: #f1f5f9;
+      padding: 6px;
+      border-radius: 16px;
+      box-shadow: var(--shadow-inset);
+    }
+
+    .nav-pill {
+      padding: 9px 16px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-sub);
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.18s ease;
+    }
+
+    .nav-pill.active {
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: 0 5px 12px -4px rgba(15, 23, 42, 0.14), 0 2px 0 #cbd5e1;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      color: var(--text-sub);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+
+    .dot.online { background: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+    .dot.offline { background: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); }
+
+    /* ================= BAHAGIAN CARIAN SEKOLAH ================= */
+    .search-panel {
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+
+    .search-grid {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .adv-summary { cursor: pointer; margin: 0; }
+    .adv-body { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .adv-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .adv-chk { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
+    .adv-chk input { width: 18px; height: 18px; }
+    .adv-sel { width: auto; min-width: 160px; flex: 1 1 160px; }
+    .adv-cond { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    .adv-cond .input-3d { flex: 2 1 160px; width: auto; }
+    .adv-pick {
+      display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer;
+      font: inherit; font-size: 0.94rem; font-weight: 600; white-space: nowrap; overflow: hidden;
+    }
+    .adv-pick .t { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+    .adv-pick .k { font-size: 0.7rem; color: #64748b; }
+    .adv-pick:hover { border-color: var(--primary); }
+    .adv-pick.is-active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+    .adv-mode-btn { flex: 0 1 170px; min-width: 150px; }
+    .adv-vals-btn { flex: 2 1 160px; width: auto; font-weight: 500; }
+    .adv-vals-btn .t em { color: #64748b; font-style: normal; }
+    .adv-menu { width: 340px; max-width: calc(100vw - 16px); }
+    .adv-menu .fm-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+    .adv-menu .fm-item { font-size: 0.8rem; padding: 6px 8px; }
+    .adv-menu .fm-item.active { background: var(--primary-soft); }
+    .adv-menu .fm-list { max-height: 260px; }
+    .fm-note { font-size: 0.74rem; color: #64748b; padding: 2px 4px 6px; line-height: 1.35; }
+    .fm-note.warn { color: #92400e; }
+    .fm-load { padding: 14px 8px; color: #64748b; text-align: center; }
+    .adv-res-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .adv-res-card { border: 1px solid var(--border, #e2e8f0); border-radius: 12px; padding: 14px; }
+    .adv-res-num { font-size: 1.8rem; font-weight: 800; }
+    .adv-res-card table { width: 100%; font-size: 0.85rem; margin-top: 8px; border-collapse: collapse; }
+    .adv-res-card td { padding: 3px 0; border-top: 1px solid var(--border, #eef2f7); }
+    .adv-res-card td:last-child { text-align: right; font-weight: 700; }
+    .adv-res-card .adv-list-btn { margin-top: 10px; width: 100%; }
+    /* ===== Senarai rekod Carian Meluas ===== */
+    .adv-list { margin-top: 16px; border: 1px solid var(--border-light); border-radius: 14px; padding: 14px; background: #ffffff; }
+    .adv-list-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .adv-list-title { font-size: 1rem; font-weight: 800; }
+    .adv-list-sub { font-size: 0.8rem; color: var(--text-muted); }
+    .adv-list-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .adv-list-tools .select-3d { width: auto; padding: 6px 10px; font-size: 0.8rem; }
+    .adv-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 8px 12px; font-size: 0.82rem; margin-bottom: 10px; }
+    .adv-cols { position: relative; }
+    .adv-cols > summary { list-style: none; cursor: pointer; }
+    .adv-cols > summary::-webkit-details-marker { display: none; }
+    .adv-cols-panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; width: 320px; max-width: 86vw; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 18px 40px rgba(15,23,42,.18); padding: 10px; }
+    .adv-cols-list { max-height: 260px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: 8px; padding: 4px; margin: 6px 0; }
+    .adv-cols-list label { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; font-size: 0.82rem; }
+    .adv-cols-list label:hover { background: #f1f5f9; }
+    .adv-list table.data-table { min-width: 0; }
+    .adv-list .th-label { white-space: nowrap; }
+    .field-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-sub);
+      margin-bottom: 7px;
+    }
+
+    .autocomplete-box {
+      position: relative;
+    }
+
+    .autocomplete-list {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      max-height: 290px;
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-bottom: 4px solid #cbd5e1;
+      border-radius: var(--radius-md);
+      box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.22);
+      z-index: 60;
+      display: none;
+    }
+
+    .autocomplete-item {
+      padding: 11px 15px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #f1f5f9;
+      transition: background 0.12s;
+    }
+
+    .autocomplete-item:hover {
+      background: var(--primary-soft);
+    }
+
+    .autocomplete-kod {
+      font-weight: 800;
+      color: var(--primary);
+      font-size: 0.9rem;
+      background: #eff6ff;
+      padding: 3px 9px;
+      border-radius: 8px;
+      border: 1px solid #dbeafe;
+      flex-shrink: 0;
+    }
+
+    .autocomplete-nama {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--text-main);
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ================= KAD KPI 3D ================= */
+    .school-banner {
+      padding: 20px 24px;
+      margin-bottom: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: linear-gradient(135deg, #ffffff 0%, #f5f9ff 100%);
+    }
+
+    .school-badge {
+      display: inline-block;
+      background: var(--primary-soft);
+      color: var(--primary);
+      border: 1px solid #bfdbfe;
+      font-weight: 800;
+      font-size: 0.82rem;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 6px;
+    }
+
+    .school-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .kpi-card {
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+    }
+
+    .kpi-murid::after { background: linear-gradient(90deg, #10b981, #34d399); }
+    .kpi-guru::after { background: linear-gradient(90deg, #4f46e5, #818cf8); }
+    .kpi-akp::after { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .kpi-ratio::after { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+
+    .kpi-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-sub);
+    }
+
+    .kpi-value {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 6px 0 4px;
+      color: var(--text-main);
+    }
+
+    .kpi-meta {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    /* ================= BAR KAWALAN JADUAL & MOD PAPARAN ================= */
+    .control-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .sub-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .cat-tab {
+      padding: 10px 16px;
+      border-radius: 13px;
+      font-weight: 700;
+      font-size: 0.86rem;
+      background: #ffffff;
+      color: var(--text-sub);
+      border: 1px solid #dbe2ec;
+      border-bottom: 4px solid #cbd5e1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+
+    .cat-tab .count-chip {
+      background: #f1f5f9;
+      color: var(--text-main);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+    }
+
+    .cat-tab.active-murid { background: var(--murid-soft); color: var(--murid-dark); border-color: #6ee7b7; border-bottom-color: var(--murid); }
+    .cat-tab.active-guru { background: var(--guru-soft); color: var(--guru-dark); border-color: #a5b4fc; border-bottom-color: var(--guru); }
+    .cat-tab.active-akp { background: var(--akp-soft); color: var(--akp-dark); border-color: #fcd34d; border-bottom-color: var(--akp); }
+    .cat-tab.active-all { background: var(--primary-soft); color: var(--primary-dark); border-color: #93c5fd; border-bottom-color: var(--primary); }
+
+    /* ================= KAD JADUAL DATA ================= */
+    .data-section {
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .data-section-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .section-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-pill {
+      width: 12px;
+      height: 28px;
+      border-radius: 6px;
+    }
+
+    .section-tools {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mini-search {
+      width: 220px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+    }
+
+    .table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      background: #ffffff;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+      min-width: 560px;
+    }
+
+    table.data-table thead th {
+      position: sticky;
+      top: 0;
+      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+      color: var(--text-main);
+      font-weight: 800;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 2px solid #cbd5e1;
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    table.data-table thead th:hover {
+      background: #e2e8f0;
+    }
+
+    /* ===== Tajuk kolum gaya Excel (Susun & Tapis) ===== */
+    table.data-table thead th.th-excel { padding: 8px 8px 8px 14px; cursor: default; }
+    .th-inner { display: flex; align-items: center; gap: 6px; }
+    .th-label { cursor: pointer; flex: 1; }
+    .th-sort-ind { font-size: 0.7rem; color: var(--primary); min-width: 10px; }
+    .th-filter-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; padding: 0;
+      border: 1px solid #cbd5e1; border-radius: 5px;
+      background: #ffffff; color: #475569;
+      font-size: 0.7rem; line-height: 1; cursor: pointer;
+      box-shadow: 0 1px 0 #cbd5e1;
+    }
+    .th-filter-btn:hover { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+    th.is-filtered .th-filter-btn,
+    th.is-sorted .th-filter-btn { background: var(--primary); border-color: var(--primary-dark); color: #ffffff; }
+
+    .filter-menu {
+      position: fixed; z-index: 9999; display: none;
+      width: 280px; background: #ffffff;
+      border: 1px solid #cbd5e1; border-radius: 12px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+      padding: 8px; font-size: 0.84rem; color: var(--text-main);
+    }
+    .filter-menu.open { display: block; }
+    .fm-title { font-size: 0.72rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 4px 8px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fm-item {
+      display: flex; align-items: center; gap: 8px; width: 100%;
+      padding: 7px 8px; border: 0; border-radius: 7px; background: transparent;
+      font: inherit; font-weight: 600; color: inherit; text-align: left; cursor: pointer;
+    }
+    .fm-item:hover { background: var(--primary-soft); color: var(--primary); }
+    .fm-item.active { color: var(--primary); }
+    .fm-sep { height: 1px; background: var(--border-light); margin: 6px 0; }
+    .fm-search { width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 7px; font: inherit; margin-bottom: 6px; }
+    .fm-list { max-height: 230px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: 8px; padding: 4px; }
+    .fm-check { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; font-weight: 500; }
+    .fm-check:hover { background: #f1f5f9; }
+    .fm-check span.v { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fm-check span.c { font-size: 0.72rem; color: var(--text-muted); }
+    .fm-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+
+    table.data-table tbody td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #1e293b;
+      vertical-align: middle;
+    }
+
+    table.data-table tbody tr:hover {
+      background: #f8fbff;
+    }
+
+    .pagination-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px;
+      font-size: 0.82rem;
+      color: var(--text-sub);
+    }
+
+    /* ================= MOD MUAT NAIK EXCEL ================= */
+    .upload-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .upload-card {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .dropzone {
+      border: 2px dashed #cbd5e1;
+      border-radius: var(--radius-md);
+      padding: 22px 14px;
+      text-align: center;
+      background: var(--bg-soft);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 12px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+      box-shadow: var(--shadow-inset);
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2563eb, #10b981);
+      transition: width 0.25s ease;
+    }
+
+    /* ================= MODAL PEMILIH KOLUM DINAMIK ================= */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 900;
+      background: rgba(15, 23, 42, 0.42);
+      backdrop-filter: blur(5px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-box {
+      width: 100%;
+      max-width: 720px;
+      max-height: 86vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .col-checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px;
+      overflow-y: auto;
+      padding: 6px 2px;
+      margin: 12px 0 18px;
+      max-height: 48vh;
+    }
+
+    .col-chip {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 12px;
+      border-radius: 11px;
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-bottom: 3px solid #cbd5e1;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-main);
+      transition: all 0.14s;
+    }
+
+    .col-chip:has(input:checked) {
+      background: var(--primary-soft);
+      border-color: #93c5fd;
+      border-bottom-color: var(--primary);
+      color: var(--primary-dark);
+    }
+
+    .col-chip input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      flex-shrink: 0;
+    }
+
+    /* ================= TOAST & LOADING ================= */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      background: #ffffff;
+      color: var(--text-main);
+      border: 1px solid #cbd5e1;
+      border-bottom: 4px solid var(--primary);
+      padding: 13px 20px;
+      border-radius: 14px;
+      box-shadow: 0 18px 36px -10px rgba(15, 23, 42, 0.24);
+      font-size: 0.88rem;
+      font-weight: 700;
+      display: none;
+      max-width: 360px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 46px 20px;
+      color: var(--text-sub);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(37, 99, 235, 0.2);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
+
+    /* ================= RESPONSIF TELEFON PINTAR & TABLET ================= */
+    @media (max-width: 980px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .upload-grid { grid-template-columns: 1fr; }
+      .search-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      #appShell { padding: 12px 12px 70px; }
+      .topbar { padding: 14px; }
+      .nav-pills { width: 100%; justify-content: space-between; }
+      .nav-pill { flex: 1; justify-content: center; padding: 9px 8px; font-size: 0.78rem; }
+      .kpi-value { font-size: 1.55rem; }
+      .mini-search { width: 100%; }
+      .section-tools { width: 100%; }
+      .school-title { font-size: 1.12rem; }
+    }
+
+    /* ================= MOD CETAK LAPORAN ================= */
+    @media print {
+      body { background: #ffffff !important; }
+      .topbar, .search-panel, .control-bar, .section-tools, .pagination-bar, #lockScreen, #toast { display: none !important; }
+      .card-3d { box-shadow: none !important; border: 1px solid #cbd5e1 !important; break-inside: avoid; }
+      .table-wrapper { overflow: visible !important; }
+      table.data-table { min-width: auto !important; font-size: 9pt !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================= SKRIN LOG MASUK KESELAMATAN ================= -->
+  <div id="lockScreen">
+    <div class="card-3d lock-card">
+      <div class="lock-emblem">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <h1>Dashboard Data Sekolah</h1>
+      <p>Akses terhad. Sila masukkan kata laluan keselamatan untuk membuka pangkalan data Murid, Guru & AKP.</p>
+      <div class="pin-wrap">
+        <input id="pinInput" type="password" inputmode="numeric" maxlength="12" class="input-3d pin-input" placeholder="••••••" autocomplete="off" />
+        <button type="button" class="pin-toggle" id="togglePinVis" title="Tunjuk/Sembunyi Kata Laluan">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <div id="pinError" class="error-msg"></div>
+      <button id="btnUnlock" class="btn-3d btn-primary" style="width:100%;">Buka Aplikasi</button>
+    </div>
+  </div>
+
+  <!-- ================= APLIKASI UTAMA ================= -->
+  <div id="appShell">
+    <!-- BAR ATAS KORPORAT 3D -->
+    <header class="card-3d topbar">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h2>Sistem Dashboard Data Sekolah</h2>
+          <span>Analisis Bersepadu Murid • Guru • AKP</span>
+        </div>
+      </div>
+
+      <nav class="nav-pills" aria-label="Menu Utama">
+        <button class="nav-pill active" data-view="dashboard">📊 Dashboard</button>
+        <button class="nav-pill" data-view="upload">📤 Muat Naik Excel</button>
+        <button class="nav-pill" data-view="settings">⚙️ Tetapan</button>
+      </nav>
+
+      <div class="topbar-actions">
+        <div class="status-dot" id="connStatus">
+          <span class="dot"></span>
+          <span>Menyemak...</span>
+        </div>
+        <button class="btn-3d btn-white btn-sm" id="btnLock" title="Kunci Semula Aplikasi">🔒 Kunci</button>
+      </div>
+    </header>
+
+    <!-- ================= PAPARAN 1: DASHBOARD PERBANDINGAN SEKOLAH ================= -->
+    <section id="view-dashboard" class="view-panel active">
+      <div class="card-3d search-panel">
+        <div class="search-grid">
+          <div class="autocomplete-box">
+            <label class="field-label" for="schoolSearchInput">Cari atau Pilih Kod Sekolah / Nama Sekolah</label>
+            <input id="schoolSearchInput" type="text" class="input-3d" placeholder="Contoh: KBA1008, KBS1008 atau taip nama sekolah..." autocomplete="off" />
+            <div id="schoolDropdown" class="autocomplete-list"></div>
+          </div>
+          <button id="btnLoadSchool" class="btn-3d btn-primary">🔍 Papar Data Sekolah</button>
+          <button id="btnRefreshMeta" class="btn-3d btn-white" title="Muat semula indeks sekolah daripada Google Sheet">🔄 Segar Semula</button>
+        </div>
+      </div>
+
+      <!-- CARIAN MELUAS SELURUH NEGARA -->
+      <div class="card-3d search-panel" id="advPanel">
+        <details id="advDetails">
+          <summary class="field-label adv-summary">🔎 Carian Meluas — kira jumlah dalam semua data (seluruh Malaysia)</summary>
+          <div class="adv-body">
+            <div class="adv-row">
+              <span class="field-label" style="margin:0;">Cari dalam:</span>
+              <label class="adv-chk"><input type="checkbox" data-adv-cat="MURID"> Murid</label>
+              <label class="adv-chk"><input type="checkbox" data-adv-cat="GURU"> Guru</label>
+              <label class="adv-chk"><input type="checkbox" data-adv-cat="AKP"> AKP</label>
+            </div>
+            <div id="advConds"></div>
+            <div class="adv-row">
+              <button type="button" id="advAddCond" class="btn-3d btn-white btn-sm">＋ Tambah Syarat</button>
+              <label class="field-label" style="margin:0;" for="advGroup">Pecahan ikut:</label>
+              <select id="advGroup" class="select-3d adv-sel"></select>
+              <button type="button" id="advRun" class="btn-3d btn-primary">📊 Kira Jumlah</button>
+            </div>
+            <div id="advResult"></div>
+          </div>
+        </details>
+      </div>
+
+      <!-- KEADAAN KOSONG SEBELUM CARIAN -->
+      <div id="dashboardPlaceholder" class="card-3d empty-state">
+        <div style="font-size:2.6rem; margin-bottom:10px;">🏫</div>
+        <h3 style="font-size:1.1rem; font-weight:800; color:var(--text-main); margin-bottom:6px;">Pilih Kod Sekolah Untuk Membandingkan Data</h3>
+        <p style="font-size:0.9rem; max-width:520px; margin:0 auto;">
+          Taip kod sekolah pada kotak carian di atas untuk memaparkan senarai <strong>Murid</strong>, <strong>Guru</strong>, dan <strong>AKP</strong> secara serentak mengikut pilihan kolum anda.
+        </p>
+      </div>
+
+      <div id="schoolLoadingCard" class="card-3d empty-state" style="display:none;">
+        <div class="spinner" style="width:34px; height:34px; border-width:4px; margin:0 auto 14px;"></div>
+        <h3 id="schoolLoadingTitle" style="font-size:1.05rem; font-weight:800; color:var(--text-main); margin-bottom:6px;">Memuat data sekolah...</h3>
+        <p id="schoolLoadingSub" style="font-size:0.86rem; max-width:520px; margin:0 auto;">Sedang mengambil data Murid, Guru &amp; AKP dari Google Sheet.</p>
+      </div>
+
+      <!-- HASIL PAPARAN SEKOLAH -->
+      <div id="schoolResultArea" style="display:none;">
+        <!-- BANNER SEKOLAH -->
+        <div class="card-3d school-banner">
+          <div>
+            <span id="resKodBadge" class="school-badge">KOD SEKOLAH</span>
+            <h2 id="resNamaSekolah" class="school-title">NAMA SEKOLAH</h2>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button id="btnExportSchool" class="btn-3d btn-emerald btn-sm">📥 Eksport Excel Sekolah</button>
+            <button id="btnPrintSchool" class="btn-3d btn-white btn-sm">🖨️ Cetak Laporan</button>
+          </div>
+        </div>
+
+        <!-- KAD KPI 3D -->
+        <div class="kpi-grid">
+          <div class="card-3d card-3d-interactive kpi-card kpi-murid">
+            <div class="kpi-label">Jumlah Murid</div>
+            <div class="kpi-value" id="kpiMurid">0</div>
+            <div class="kpi-meta" id="kpiMuridMeta">L: 0 • P: 0</div>
+          </div>
+          <div class="card-3d card-3d-interactive kpi-card kpi-guru">
+            <div class="kpi-label">Jumlah Guru</div>
+            <div class="kpi-value" id="kpiGuru">0</div>
+            <div class="kpi-meta" id="kpiGuruMeta">L: 0 • P: 0</div>
+          </div>
+          <div class="card-3d card-3d-interactive kpi-card kpi-akp">
+            <div class="kpi-label">Jumlah AKP</div>
+            <div class="kpi-value" id="kpiAkp">0</div>
+            <div class="kpi-meta" id="kpiAkpMeta">L: 0 • P: 0</div>
+          </div>
+          <div class="card-3d card-3d-interactive kpi-card kpi-ratio">
+            <div class="kpi-label">Nisbah Murid : Guru</div>
+            <div class="kpi-value" id="kpiRatio">0 : 1</div>
+            <div class="kpi-meta" id="kpiRatioMeta">Keseluruhan Warga: 0</div>
+          </div>
+        </div>
+
+        <!-- TAB KATEGORI & MOD PAPARAN -->
+        <div class="control-bar">
+          <div class="sub-tabs">
+            <button class="cat-tab active-all" data-catmode="ALL">📋 Semua Serentak</button>
+            <button class="cat-tab" data-catmode="MURID">👨‍🎓 Murid <span class="count-chip" id="chipMurid">0</span></button>
+            <button class="cat-tab" data-catmode="GURU">👩‍🏫 Guru <span class="count-chip" id="chipGuru">0</span></button>
+            <button class="cat-tab" data-catmode="AKP">🧑‍💼 AKP <span class="count-chip" id="chipAkp">0</span></button>
+          </div>
+        </div>
+
+        <!-- KONTAINER JADUAL 3 KATEGORI -->
+        <div id="tablesContainer"></div>
+      </div>
+    </section>
+
+    <!-- ================= PAPARAN 2: MUAT NAIK EXCEL KE GOOGLE SHEET ================= -->
+    <section id="view-upload" class="view-panel">
+      <div class="card-3d" style="padding:20px 22px; margin-bottom:18px;">
+        <h3 style="font-size:1.08rem; font-weight:800; margin-bottom:6px;">Muat Naik Fail Excel (.xlsx / .xls / .csv) ke Google Sheet</h3>
+        <p style="font-size:0.87rem; color:var(--text-sub);">
+          Data akan dihantar secara berperingkat (<em>batch upload</em> 500 baris setiap pusingan) ke Google Sheet supaya stabil walaupun fail bersaiz besar. Pastikan fail mempunyai kolum <strong>KODSEKOLAH</strong>.
+        </p>
+        <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
+          <label style="display:flex; align-items:center; gap:7px; font-size:0.86rem; font-weight:700; cursor:pointer;">
+            <input type="radio" name="uploadMode" value="replace" checked style="accent-color:var(--primary);" />
+            Ganti Data Sedia Ada (Replace)
+          </label>
+          <label style="display:flex; align-items:center; gap:7px; font-size:0.86rem; font-weight:700; cursor:pointer;">
+            <input type="radio" name="uploadMode" value="append" style="accent-color:var(--primary);" />
+            Tambah di Bawah Data Sedia Ada (Append — sesuai untuk gabung ikut PPD/Negeri)
+          </label>
+        </div>
+      </div>
+
+      <div class="upload-grid">
+        <!-- KAD UPLOAD MURID -->
+        <div class="card-3d upload-card" data-upload-cat="MURID">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h4 style="font-weight:800; color:var(--murid-dark);">1. Data Murid</h4>
+            <span class="school-badge" style="margin:0; background:var(--murid-soft); color:var(--murid-dark); border-color:#a7f3d0;" id="statCountMURID">0 rekod</span>
+          </div>
+          <label class="dropzone" for="fileMURID">
+            <div style="font-size:1.8rem; margin-bottom:6px;">📄</div>
+            <div style="font-weight:700; font-size:0.86rem;">Klik atau tarik fail Excel Murid ke sini</div>
+            <div style="font-size:0.76rem; color:var(--text-muted); margin-top:4px;">.xlsx, .xls atau .csv</div>
+            <input type="file" id="fileMURID" accept=".xlsx,.xls,.csv" hidden />
+          </label>
+          <div id="infoMURID" style="font-size:0.82rem; color:var(--text-sub); min-height:38px;">Belum ada fail dipilih.</div>
+          <div class="progress-track"><div class="progress-fill" id="progMURID"></div></div>
+          <div id="progTextMURID" style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">Sedia</div>
+          <button class="btn-3d btn-emerald" id="btnUploadMURID" disabled>🚀 Muat Naik Data Murid</button>
+        </div>
+
+        <!-- KAD UPLOAD GURU -->
+        <div class="card-3d upload-card" data-upload-cat="GURU">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h4 style="font-weight:800; color:var(--guru-dark);">2. Data Guru</h4>
+            <span class="school-badge" style="margin:0; background:var(--guru-soft); color:var(--guru-dark); border-color:#c7d2fe;" id="statCountGURU">0 rekod</span>
+          </div>
+          <label class="dropzone" for="fileGURU">
+            <div style="font-size:1.8rem; margin-bottom:6px;">📄</div>
+            <div style="font-weight:700; font-size:0.86rem;">Klik atau tarik fail Excel Guru ke sini</div>
+            <div style="font-size:0.76rem; color:var(--text-muted); margin-top:4px;">.xlsx, .xls atau .csv</div>
+            <input type="file" id="fileGURU" accept=".xlsx,.xls,.csv" hidden />
+          </label>
+          <div id="infoGURU" style="font-size:0.82rem; color:var(--text-sub); min-height:38px;">Belum ada fail dipilih.</div>
+          <div class="progress-track"><div class="progress-fill" id="progGURU"></div></div>
+          <div id="progTextGURU" style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">Sedia</div>
+          <button class="btn-3d btn-primary" id="btnUploadGURU" disabled>🚀 Muat Naik Data Guru</button>
+        </div>
+
+        <!-- KAD UPLOAD AKP -->
+        <div class="card-3d upload-card" data-upload-cat="AKP">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h4 style="font-weight:800; color:var(--akp-dark);">3. Data AKP</h4>
+            <span class="school-badge" style="margin:0; background:var(--akp-soft); color:var(--akp-dark); border-color:#fde68a;" id="statCountAKP">0 rekod</span>
+          </div>
+          <label class="dropzone" for="fileAKP">
+            <div style="font-size:1.8rem; margin-bottom:6px;">📄</div>
+            <div style="font-weight:700; font-size:0.86rem;">Klik atau tarik fail Excel AKP ke sini</div>
+            <div style="font-size:0.76rem; color:var(--text-muted); margin-top:4px;">.xlsx, .xls atau .csv</div>
+            <input type="file" id="fileAKP" accept=".xlsx,.xls,.csv" hidden />
+          </label>
+          <div id="infoAKP" style="font-size:0.82rem; color:var(--text-sub); min-height:38px;">Belum ada fail dipilih.</div>
+          <div class="progress-track"><div class="progress-fill" id="progAKP"></div></div>
+          <div id="progTextAKP" style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">Sedia</div>
+          <button class="btn-3d btn-white" id="btnUploadAKP" disabled style="border-bottom-color:var(--akp); color:var(--akp-dark);">🚀 Muat Naik Data AKP</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PAPARAN 3: TETAPAN SAMBUNGAN ================= -->
+    <section id="view-settings" class="view-panel">
+      <div class="card-3d" style="padding:24px; max-width:760px;">
+        <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:6px;">Tetapan</h3>
+        <p style="font-size:0.86rem; color:var(--text-sub); margin-bottom:16px;">
+          Sambungan ke Google Sheet ditetapkan secara kekal dan <strong>bersambung secara automatik</strong> setiap kali aplikasi dibuka.
+          Data disegarkan sendiri di latar belakang setiap 5 minit, dan sistem akan cuba menyambung semula dengan sendiri jika talian terputus.
+          Butang di bawah hanya untuk segar data serta-merta (tidak wajib).
+        </p>
+
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:22px;">
+          <button id="btnTestConn" class="btn-3d btn-primary">🔄 Uji Sambungan & Segar Data</button>
+          <button id="btnResetCols" class="btn-3d btn-white">♻️ Tetap Semula Pilihan Kolum</button>
+        </div>
+
+        <div style="background:var(--bg-soft); border:1px solid var(--border-light); border-radius:14px; padding:16px;">
+          <h4 style="font-size:0.9rem; font-weight:800; margin-bottom:8px;">Ringkasan Pangkalan Data Semasa</h4>
+          <div id="dbSummaryText" style="font-size:0.85rem; color:var(--text-sub); line-height:1.8;">
+            Sedang menyambung ke Google Sheet secara automatik...
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= MODAL PEMILIH KOLUM DINAMIK ================= -->
+  <div id="colModal" class="modal-backdrop">
+    <div class="card-3d modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="colModalTitle" style="font-size:1.1rem; font-weight:800;">Pilih Kolum Paparan</h3>
+          <p style="font-size:0.82rem; color:var(--text-sub);">Tandakan kolum maklumat yang ingin dipaparkan dalam jadual.</p>
+        </div>
+        <button id="btnCloseColModal" class="btn-3d btn-white btn-sm">✕ Tutup</button>
+      </div>
+
+      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+        <input id="colFilterInput" type="text" class="input-3d" placeholder="Cari nama kolum..." style="flex:1; min-width:180px; padding:9px 12px; font-size:0.86rem;" />
+        <button id="btnColDefault" class="btn-3d btn-white btn-sm">Lalai</button>
+        <button id="btnColAll" class="btn-3d btn-white btn-sm">Pilih Semua</button>
+        <button id="btnColClear" class="btn-3d btn-white btn-sm">Kosongkan</button>
+      </div>
+
+      <div id="colCheckboxGrid" class="col-checkbox-grid"></div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button id="btnSaveCols" class="btn-3d btn-primary">✓ Guna Pilihan Kolum</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFIKASI TOAST -->
+  <div id="toast"></div>
+
+  <script>
+    /* ========================================================================
+     * KONFIGURASI UTAMA
+     * ======================================================================== */
+    const APP_PIN = '101010';
+    // URL Web App ditetapkan secara KEKAL pada baris ke-5 fail ini (window.GAS_URL).
+    // Semua pengguna yang membuka pautan ini akan berhubung ke Google Sheet yang SAMA.
+    const DEFAULT_GAS_URL = String(window.GAS_URL || '').trim();
+    // Buang URL lama yang pernah disimpan dalam pelayar supaya tidak mengatasi URL kekal
+    try { localStorage.removeItem('ds_gas_url'); } catch (e) {}
+    const BATCH_UPLOAD_SIZE = 500;
+
+    // Kolum lalai yang dicadangkan mengikut fail sebenar anda
+    const DEFAULT_COLS = {
+      MURID: ['NAMA', 'NOKP', 'JANTINA', 'IDKELAS', 'KETURUNAN', 'AGAMA', 'STATUS_OKU', 'SES'],
+      GURU: ['NAMA', 'JANTINA', 'JAWATAN', 'GRED_PENYANDANG', 'OPSYEN_DOMINAN', 'TELEFON'],
+      AKP: ['NAMA', 'JANTINA', 'JAWATAN', 'GRED_PENYANDANG', 'TARAF_JAWATAN', 'TELEFON']
+    };
+
+    const CAT_META = {
+      MURID: { label: 'Senarai Murid', color: '#059669' },
+      GURU:  { label: 'Senarai Guru',  color: '#4f46e5' },
+      AKP:   { label: 'Senarai AKP',   color: '#d97706' }
+    };
+
+    // Keadaan Global Aplikasi
+    const state = {
+      gasUrl: DEFAULT_GAS_URL.startsWith('http') ? DEFAULT_GAS_URL : '',
+      metadata: { headers: { MURID: [], GURU: [], AKP: [] }, counts: { MURID: 0, GURU: 0, AKP: 0 }, schools: [] },
+      currentSchool: null,
+      catMode: 'ALL',
+      selectedCols: {
+        MURID: JSON.parse(localStorage.getItem('ds_cols_MURID') || 'null'),
+        GURU:  JSON.parse(localStorage.getItem('ds_cols_GURU')  || 'null'),
+        AKP:   JSON.parse(localStorage.getItem('ds_cols_AKP')   || 'null')
+      },
+      tableState: {
+        MURID: { search: '', sortKey: loadSort('MURID').k, sortAsc: loadSort('MURID').a, filters: {}, page: 1, pageSize: 25 },
+        GURU:  { search: '', sortKey: loadSort('GURU').k, sortAsc: loadSort('GURU').a, filters: {}, page: 1, pageSize: 25 },
+        AKP:   { search: '', sortKey: loadSort('AKP').k, sortAsc: loadSort('AKP').a, filters: {}, page: 1, pageSize: 25 }
+      },
+      parsedFiles: { MURID: null, GURU: null, AKP: null },
+      activeModalCat: null
+    };
+
+    function loadSort(cat) {
+      try { const v = JSON.parse(localStorage.getItem('ds_sort_' + cat) || 'null'); if (v && v.k) return { k: v.k, a: v.a !== false }; } catch (e) {}
+      return { k: null, a: true };
+    }
+    function saveSorts() {
+      try { ['MURID','GURU','AKP'].forEach(c => { const t = state.tableState[c];
+        if (t.sortKey) localStorage.setItem('ds_sort_' + c, JSON.stringify({ k: t.sortKey, a: t.sortAsc }));
+        else localStorage.removeItem('ds_sort_' + c); }); } catch (e) {}
+    }
+
+    /* ========================================================================
+     * UTILITI & API
+     * ======================================================================== */
+    function showToast(msg, isError = false) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.borderBottomColor = isError ? '#dc2626' : '#1d4ed8';
+      el.style.display = 'block';
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => { el.style.display = 'none'; }, 3800);
+    }
+
+    function setConnStatus(online, text) {
+      const wrap = document.getElementById('connStatus');
+      wrap.innerHTML = `<span class="dot ${online ? 'online' : 'offline'}"></span><span>${text}</span>`;
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Tindakan baca sahaja boleh dicuba semula secara automatik (muat naik TIDAK, elak data berganda)
+    const RETRYABLE_ACTIONS = ['getMetadata', 'getSchoolData', 'verifyPin'];
+
+    async function callGAS(payload) {
+      const tries = RETRYABLE_ACTIONS.includes(payload.action) ? 3 : 1;
+      let lastErr;
+      for (let i = 0; i < tries; i++) {
+        try {
+          return await callGASOnce(payload);
+        } catch (err) {
+          lastErr = err;
+          // Ralat logik dari pelayan (cth. kata laluan salah) tidak perlu dicuba semula
+          if (err && err.fromServer) break;
+          if (i < tries - 1) await new Promise(r => setTimeout(r, 2000 * (i + 1)));
+        }
+      }
+      throw lastErr;
+    }
+
+    async function callGASOnce(payload) {
+      if (!state.gasUrl || !state.gasUrl.startsWith('http')) {
+        throw new Error('URL Google Apps Script belum ditetapkan pada baris ke-5 fail index.html.');
+      }
+      const res = await fetch(state.gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ ...payload, pin: APP_PIN })
+      });
+      if (!res.ok) throw new Error('Ralat rangkaian HTTP ' + res.status);
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); }
+      catch (e) { throw new Error('Respon Google Apps Script tidak sah. Pastikan Web App di-deploy dengan akses "Anyone".'); }
+      // Pastikan URL ini benar-benar menjalankan code.gs Dashboard Data Sekolah
+      if (!data || typeof data.status === 'undefined') {
+        const extra = data && (data.error || data.message) ? ' (Respon: ' + (data.error || data.message) + ')' : '';
+        throw new Error('URL Apps Script ini BUKAN API Dashboard Data Sekolah' + extra + '. Sila deploy code.gs dalam projek Apps Script yang berasingan.');
+      }
+      if (data.status === 'error') {
+        const e = new Error(data.message || 'Ralat pelayan.');
+        e.fromServer = true;
+        throw e;
+      }
+      return data;
+    }
+
+    /* ========================================================================
+     * KESELAMATAN KATA LALUAN (101010)
+     * ======================================================================== */
+    function unlockApp() {
+      const val = document.getElementById('pinInput').value.trim();
+      const err = document.getElementById('pinError');
+      if (val !== APP_PIN) {
+        err.textContent = 'Kata laluan salah. Sila cuba lagi.';
+        document.getElementById('pinInput').focus();
+        return;
+      }
+      err.textContent = '';
+      localStorage.setItem('ds_auth', '1');
+      document.getElementById('lockScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = 'block';
+      initAfterUnlock();
+    }
+
+    document.getElementById('btnUnlock').addEventListener('click', unlockApp);
+    document.getElementById('pinInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') unlockApp();
+    });
+
+    document.getElementById('togglePinVis').addEventListener('click', () => {
+      const inp = document.getElementById('pinInput');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    });
+
+    document.getElementById('btnLock').addEventListener('click', () => {
+      localStorage.removeItem('ds_auth');
+      sessionStorage.removeItem('ds_auth');
+      document.getElementById('pinInput').value = '';
+      document.getElementById('appShell').style.display = 'none';
+      document.getElementById('lockScreen').style.display = 'flex';
+    });
+
+    /* ========================================================================
+     * NAVIGASI UTAMA & INISIALISASI
+     * ======================================================================== */
+    document.querySelectorAll('.nav-pill').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-pill').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('view-' + btn.dataset.view).classList.add('active');
+      });
+    });
+
+    async function initAfterUnlock() {
+      if (!state.gasUrl) {
+        setConnStatus(false, 'Belum Tetap URL');
+        showToast('URL Google Apps Script belum ditetapkan pada baris ke-5 fail index.html.', true);
+        return;
+      }
+      await initMetadata();
+    }
+
+    const META_LS_KEY = 'ds_meta_cache_v1';
+
+    function loadCachedMetadata() {
+      try {
+        const c = JSON.parse(localStorage.getItem(META_LS_KEY) || 'null');
+        if (c && c.url === state.gasUrl && c.data) return c.data;
+      } catch (e) {}
+      return null;
+    }
+
+    async function initMetadata() {
+      // Papar indeks tersimpan serta-merta, kemudian segarkan di latar belakang
+      const cached = loadCachedMetadata();
+      if (cached) {
+        applyMetadata(cached);
+        setConnStatus(true, `${cached.schools.length} Sekolah`);
+      }
+      await loadMetadata(!!cached);
+    }
+
+    /* ------------------------------------------------------------------
+     * SAMBUNGAN AUTOMATIK SEPANJANG MASA
+     * - Sambung sendiri bila aplikasi dibuka
+     * - Segar data di latar belakang setiap 5 minit
+     * - Cuba sambung semula sendiri jika gagal / talian terputus
+     * - Segar semula bila tab dibuka kembali atau internet kembali
+     * ------------------------------------------------------------------ */
+    const AUTO_REFRESH_MS = 5 * 60 * 1000;
+    const conn = { loading: null, lastOk: 0, retryTimer: null, retryDelay: 5000, refreshTimer: null, started: false };
+
+    function scheduleReconnect() {
+      clearTimeout(conn.retryTimer);
+      const wait = conn.retryDelay;
+      conn.retryDelay = Math.min(conn.retryDelay * 2, 60000);
+      let left = Math.round(wait / 1000);
+      const hasData = state.metadata.schools.length > 0;
+      const tick = () => {
+        if (left <= 0) { loadMetadata(true); return; }
+        setConnStatus(hasData, hasData
+          ? `${state.metadata.schools.length} Sekolah • sambung semula ${left}s`
+          : `Menyambung semula dalam ${left}s...`);
+        left--;
+        conn.retryTimer = setTimeout(tick, 1000);
+      };
+      tick();
+    }
+
+    function startAutoConnection() {
+      if (conn.started) return;
+      conn.started = true;
+      conn.refreshTimer = setInterval(() => {
+        if (document.visibilityState === 'visible' && navigator.onLine !== false) loadMetadata(true);
+      }, AUTO_REFRESH_MS);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && Date.now() - conn.lastOk > 60000) loadMetadata(true);
+      });
+      window.addEventListener('online', () => {
+        conn.retryDelay = 5000;
+        loadMetadata(true);
+      });
+      window.addEventListener('offline', () => {
+        const hasData = state.metadata.schools.length > 0;
+        setConnStatus(false, hasData ? `${state.metadata.schools.length} Sekolah • Luar talian` : 'Luar talian');
+      });
+    }
+
+    async function loadMetadata(silent = false) {
+      // Elak panggilan bertindih
+      if (conn.loading) return conn.loading;
+      clearTimeout(conn.retryTimer);
+      startAutoConnection();
+      const hasData = state.metadata.schools.length > 0;
+      if (!hasData) setConnStatus(false, 'Menyambung ke Google Sheet...');
+      else if (!silent) setConnStatus(true, `${state.metadata.schools.length} Sekolah • menyegar...`);
+
+      conn.loading = (async () => {
+        try {
+          const res = await callGAS({ action: 'getMetadata' });
+          applyMetadata(res);
+          try { localStorage.setItem(META_LS_KEY, JSON.stringify({ url: state.gasUrl, data: { dataVer: res.dataVer || '', headers: res.headers, counts: res.counts, schools: res.schools } })); } catch (e) {}
+          conn.lastOk = Date.now();
+          conn.retryDelay = 5000;
+          setConnStatus(true, `${state.metadata.schools.length} Sekolah`);
+          return true;
+        } catch (err) {
+          if (!silent) showToast(err.message, true);
+          // Jangan berhenti: cuba sambung semula secara automatik
+          if (!(err && err.fromServer)) scheduleReconnect();
+          else setConnStatus(false, 'Ralat pelayan');
+          return false;
+        } finally {
+          conn.loading = null;
+        }
+      })();
+      return conn.loading;
+    }
+
+    function applyMetadata(res) {
+        state.metadata = {
+          dataVer: res.dataVer || '',
+          headers: res.headers || { MURID: [], GURU: [], AKP: [] },
+          counts: res.counts || { MURID: 0, GURU: 0, AKP: 0 },
+          schools: res.schools || []
+        };
+        if (window.renderAdvPanel) setTimeout(window.renderAdvPanel, 0);
+
+        // Pastikan pilihan kolum lalai tersedia bagi setiap kategori
+        ['MURID', 'GURU', 'AKP'].forEach((cat) => {
+          const allH = state.metadata.headers[cat] || [];
+          document.getElementById('statCount' + cat).textContent =
+            (state.metadata.counts[cat] || 0).toLocaleString() + ' rekod';
+
+          if (!state.selectedCols[cat] || !state.selectedCols[cat].length) {
+            state.selectedCols[cat] = getSmartDefaultCols(cat, allH);
+          } else {
+            // Tapis sekiranya struktur kolum berubah
+            const valid = state.selectedCols[cat].filter(c => allH.includes(c));
+            state.selectedCols[cat] = valid.length ? valid : getSmartDefaultCols(cat, allH);
+          }
+        });
+
+        document.getElementById('dbSummaryText').innerHTML = `
+          <div>• <strong>Jumlah Sekolah Unik:</strong> ${state.metadata.schools.length.toLocaleString()} buah sekolah</div>
+          <div>• <strong>Rekod Murid:</strong> ${(state.metadata.counts.MURID || 0).toLocaleString()} baris (${(state.metadata.headers.MURID || []).length} kolum)</div>
+          <div>• <strong>Rekod Guru:</strong> ${(state.metadata.counts.GURU || 0).toLocaleString()} baris (${(state.metadata.headers.GURU || []).length} kolum)</div>
+          <div>• <strong>Rekod AKP:</strong> ${(state.metadata.counts.AKP || 0).toLocaleString()} baris (${(state.metadata.headers.AKP || []).length} kolum)</div>
+        `;
+    }
+
+    function getSmartDefaultCols(cat, headers) {
+      if (!headers || !headers.length) return [];
+      const wanted = DEFAULT_COLS[cat] || [];
+      const matched = wanted.filter(w => headers.includes(w));
+      return matched.length >= 2 ? matched : headers.slice(0, Math.min(6, headers.length));
+    }
+
+    /* ========================================================================
+     * CARIAN & AUTOCOMPLETE KOD SEKOLAH
+     * ======================================================================== */
+    const schoolInput = document.getElementById('schoolSearchInput');
+    const schoolDropdown = document.getElementById('schoolDropdown');
+
+    function renderSchoolSuggestions(keyword) {
+      const q = String(keyword || '').trim().toUpperCase();
+      const list = state.metadata.schools.filter(s =>
+        !q || s.kod.includes(q) || s.nama.toUpperCase().includes(q)
+      ).slice(0, 40);
+
+      if (!list.length) {
+        schoolDropdown.innerHTML = `<div style="padding:12px 15px; font-size:0.84rem; color:var(--text-muted);">Tiada sekolah sepadan ditemui dalam indeks.</div>`;
+      } else {
+        schoolDropdown.innerHTML = list.map(s => `
+          <div class="autocomplete-item" data-kod="${escapeHtml(s.kod)}">
+            <span class="autocomplete-kod">${escapeHtml(s.kod)}</span>
+            <span class="autocomplete-nama">${escapeHtml(s.nama || 'Tiada Nama Sekolah')}</span>
+          </div>
+        `).join('');
+      }
+      schoolDropdown.style.display = 'block';
+    }
+
+    schoolInput.addEventListener('focus', () => {
+      if (state.metadata.schools.length) renderSchoolSuggestions(schoolInput.value);
+    });
+
+    schoolInput.addEventListener('input', () => {
+      renderSchoolSuggestions(schoolInput.value);
+    });
+
+    schoolInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        schoolDropdown.style.display = 'none';
+        loadSelectedSchool();
+      }
+    });
+
+    // Mula ambil data lebih awal bila tetikus/jari berada atas pilihan sekolah
+    schoolDropdown.addEventListener('mouseover', (e) => {
+      const item = e.target.closest('.autocomplete-item');
+      if (item) prefetchSchool(item.dataset.kod);
+    });
+    schoolDropdown.addEventListener('touchstart', (e) => {
+      const item = e.target.closest('.autocomplete-item');
+      if (item) prefetchSchool(item.dataset.kod);
+    }, { passive: true });
+
+    schoolDropdown.addEventListener('click', (e) => {
+      const item = e.target.closest('.autocomplete-item');
+      if (!item) return;
+      schoolInput.value = item.dataset.kod;
+      schoolDropdown.style.display = 'none';
+      loadSelectedSchool();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.autocomplete-box')) {
+        schoolDropdown.style.display = 'none';
+      }
+    });
+
+    document.getElementById('btnLoadSchool').addEventListener('click', loadSelectedSchool);
+    document.getElementById('btnRefreshMeta').addEventListener('click', async () => {
+      const ok = await loadMetadata();
+      if (state.currentSchool) {
+        await loadSelectedSchool({ kod: state.currentSchool.kodSekolah, force: true });
+      } else if (ok) {
+        showToast('Indeks sekolah berjaya disegarkan.');
+      }
+    });
+
+    /* ------------------------------------------------------------------
+     * CACHE DATA SEKOLAH DI PERANTI (pilih sekolah yang sama = serta-merta)
+     * ------------------------------------------------------------------ */
+    const SCHOOL_LS_KEY = 'ds_school_cache_v1';
+    const SCHOOL_LS_MAX = 15;
+    const schoolMem = new Map();      // kod -> { ver, t, data }
+    const schoolInflight = new Map(); // kod -> Promise
+
+    function schoolLsLoad() {
+      try { return JSON.parse(localStorage.getItem(SCHOOL_LS_KEY) || '{}') || {}; } catch (e) { return {}; }
+    }
+
+    function getCachedSchool(kod) {
+      let c = schoolMem.get(kod);
+      if (!c) {
+        const all = schoolLsLoad();
+        if (all[kod]) { c = all[kod]; schoolMem.set(kod, c); }
+      }
+      if (!c) return null;
+      // Abaikan cache jika data di Google Sheet sudah berubah (versi berbeza)
+      if (state.metadata.dataVer && c.ver && c.ver !== state.metadata.dataVer) return null;
+      return c;
+    }
+
+    function putCachedSchool(kod, data) {
+      const entry = { ver: data.dataVer || state.metadata.dataVer || '', t: Date.now(), data };
+      schoolMem.set(kod, entry);
+      const all = schoolLsLoad();
+      all[kod] = entry;
+      const keys = Object.keys(all).sort((a, b) => (all[b].t || 0) - (all[a].t || 0));
+      keys.slice(SCHOOL_LS_MAX).forEach(k => delete all[k]);
+      for (let i = 0; i < 4; i++) {
+        try { localStorage.setItem(SCHOOL_LS_KEY, JSON.stringify(all)); break; }
+        catch (e) {
+          // Storan penuh: buang rekod paling lama dan cuba lagi
+          const ks = Object.keys(all).sort((a, b) => (all[a].t || 0) - (all[b].t || 0));
+          if (ks.length <= 1) break;
+          delete all[ks[0]];
+        }
+      }
+    }
+
+    function fetchSchool(kod, force = false) {
+      const key = kod + (force ? '|f' : '');
+      if (schoolInflight.has(key)) return schoolInflight.get(key);
+      const p = callGAS({ action: 'getSchoolData', kodSekolah: kod, refresh: force })
+        .then(res => { putCachedSchool(res.kodSekolah || kod, res); return res; })
+        .finally(() => schoolInflight.delete(key));
+      schoolInflight.set(key, p);
+      return p;
+    }
+
+    function prefetchSchool(kod) {
+      if (!kod || getCachedSchool(kod) || schoolInflight.has(kod)) return;
+      fetchSchool(kod).catch(() => {});
+    }
+
+    function applySchoolData(res, keepTableState) {
+      const sameSchool = keepTableState && state.currentSchool && state.currentSchool.kodSekolah === res.kodSekolah;
+      state.currentSchool = res;
+      ['MURID', 'GURU', 'AKP'].forEach((cat) => {
+        const hdrs = res.data[cat]?.headers || [];
+        if (!state.selectedCols[cat] || !state.selectedCols[cat].some(c => hdrs.includes(c))) {
+          state.selectedCols[cat] = getSmartDefaultCols(cat, hdrs);
+        }
+        if (!sameSchool) {
+          state.tableState[cat].page = 1;
+          state.tableState[cat].search = '';
+          state.tableState[cat].filters = {};
+        }
+      });
+      document.getElementById('schoolLoadingCard').style.display = 'none';
+      renderSchoolDashboard();
+    }
+
+    function showSchoolLoading(kod) {
+      document.getElementById('dashboardPlaceholder').style.display = 'none';
+      document.getElementById('schoolResultArea').style.display = 'none';
+      const card = document.getElementById('schoolLoadingCard');
+      card.style.display = 'block';
+      const nama = (state.metadata.schools.find(s => s.kod === kod) || {}).nama || '';
+      document.getElementById('schoolLoadingTitle').textContent = `Memuat data ${kod}${nama ? ' — ' + nama : ''}...`;
+      const sub = document.getElementById('schoolLoadingSub');
+      const t0 = Date.now();
+      clearInterval(showSchoolLoading._timer);
+      const upd = () => {
+        const sec = Math.round((Date.now() - t0) / 1000);
+        sub.textContent = sec < 4
+          ? 'Sedang mengambil data Murid, Guru & AKP dari Google Sheet...'
+          : `Sedang mengambil data dari Google Sheet... ${sec}s (kali pertama untuk sekolah ini lebih lama, seterusnya serta-merta)`;
+      };
+      upd();
+      showSchoolLoading._timer = setInterval(upd, 1000);
+    }
+
+    function hideSchoolLoading() {
+      clearInterval(showSchoolLoading._timer);
+      document.getElementById('schoolLoadingCard').style.display = 'none';
+    }
+
+    let schoolRequestSeq = 0;
+
+    async function loadSelectedSchool(opts) {
+      const o = (opts && typeof opts === 'object' && !(opts instanceof Event)) ? opts : {};
+      const raw = (o.kod || schoolInput.value).trim();
+      if (!raw) {
+        showToast('Sila taip atau pilih Kod Sekolah terlebih dahulu.', true);
+        return;
+      }
+      // Ambil kod pertama sekiranya pengguna menaip kod + nama
+      const kod = raw.split(/\s+/)[0].toUpperCase();
+      const seq = ++schoolRequestSeq;
+      const btn = document.getElementById('btnLoadSchool');
+
+      // 1) Ada dalam peranti? Papar SERTA-MERTA
+      const cached = o.force ? null : getCachedSchool(kod);
+      if (cached) {
+        applySchoolData(cached.data, false);
+        // Segar senyap di latar belakang jika cache lebih 10 minit
+        if (Date.now() - (cached.t || 0) > 10 * 60 * 1000) {
+          fetchSchool(kod).then(res => {
+            if (seq === schoolRequestSeq) applySchoolData(res, true);
+          }).catch(() => {});
+        }
+        return;
+      }
+
+      // 2) Belum ada: ambil dari Google Sheet
+      const oldHtml = btn.dataset.html || btn.innerHTML;
+      btn.dataset.html = oldHtml;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner" style="border-top-color:#fff; border-color:rgba(255,255,255,0.3);"></span> Memuat Data...`;
+      const keepView = o.force && state.currentSchool && state.currentSchool.kodSekolah === kod;
+      if (!keepView) showSchoolLoading(kod);
+
+      try {
+        const res = await fetchSchool(kod, !!o.force);
+        if (seq !== schoolRequestSeq) return; // pengguna sudah pilih sekolah lain
+        hideSchoolLoading();
+        applySchoolData(res, !!keepView);
+        if (o.force) showToast(`Data sekolah ${res.kodSekolah} telah disegarkan.`);
+      } catch (err) {
+        if (seq !== schoolRequestSeq) return;
+        hideSchoolLoading();
+        if (!state.currentSchool) document.getElementById('dashboardPlaceholder').style.display = 'block';
+        else document.getElementById('schoolResultArea').style.display = 'block';
+        showToast(err.message, true);
+      } finally {
+        if (seq === schoolRequestSeq) {
+          btn.disabled = false;
+          btn.innerHTML = oldHtml;
+        }
+      }
+    }
+
+    /* ========================================================================
+     * PAPARAN KPI & JADUAL PERBANDINGAN
+     * ======================================================================== */
+    function countGender(headers, rows) {
+      const jIdx = headers.findIndex(h => h.toUpperCase().includes('JANTINA'));
+      if (jIdx === -1) return { L: 0, P: 0, found: false };
+      let L = 0, P = 0;
+      rows.forEach(r => {
+        const v = String(r[jIdx] || '').trim().toUpperCase();
+        if (v === 'L' || v === 'LELAKI') L++;
+        else if (v === 'P' || v === 'PEREMPUAN') P++;
+      });
+      return { L, P, found: true };
+    }
+
+    function renderSchoolDashboard() {
+      const s = state.currentSchool;
+      if (!s) return;
+
+      document.getElementById('dashboardPlaceholder').style.display = 'none';
+      document.getElementById('schoolResultArea').style.display = 'block';
+
+      document.getElementById('resKodBadge').textContent = s.kodSekolah;
+      document.getElementById('resNamaSekolah').textContent = s.namaSekolah || 'Nama Sekolah Tidak Dinyatakan';
+
+      const mRows = s.data.MURID?.rows || [];
+      const gRows = s.data.GURU?.rows || [];
+      const aRows = s.data.AKP?.rows || [];
+
+      document.getElementById('kpiMurid').textContent = mRows.length.toLocaleString();
+      document.getElementById('kpiGuru').textContent = gRows.length.toLocaleString();
+      document.getElementById('kpiAkp').textContent = aRows.length.toLocaleString();
+
+      const mGen = countGender(s.data.MURID?.headers || [], mRows);
+      const gGen = countGender(s.data.GURU?.headers || [], gRows);
+      const aGen = countGender(s.data.AKP?.headers || [], aRows);
+
+      document.getElementById('kpiMuridMeta').textContent = mGen.found ? `Lelaki: ${mGen.L} • Perempuan: ${mGen.P}` : 'Rekod Murid Aktif';
+      document.getElementById('kpiGuruMeta').textContent = gGen.found ? `Lelaki: ${gGen.L} • Perempuan: ${gGen.P}` : 'Rekod Guru Aktif';
+      document.getElementById('kpiAkpMeta').textContent = aGen.found ? `Lelaki: ${aGen.L} • Perempuan: ${aGen.P}` : 'Rekod AKP Aktif';
+
+      const ratio = gRows.length > 0 ? (mRows.length / gRows.length).toFixed(1) : '0';
+      document.getElementById('kpiRatio').textContent = `${ratio} : 1`;
+      document.getElementById('kpiRatioMeta').textContent = `Jumlah Warga Sekolah: ${(mRows.length + gRows.length + aRows.length).toLocaleString()}`;
+
+      document.getElementById('chipMurid').textContent = mRows.length;
+      document.getElementById('chipGuru').textContent = gRows.length;
+      document.getElementById('chipAkp').textContent = aRows.length;
+
+      renderTables();
+    }
+
+    document.querySelectorAll('.cat-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.catMode = btn.dataset.catmode;
+        document.querySelectorAll('.cat-tab').forEach(b => {
+          b.className = 'cat-tab';
+        });
+        const mapClass = { ALL: 'active-all', MURID: 'active-murid', GURU: 'active-guru', AKP: 'active-akp' };
+        btn.classList.add(mapClass[state.catMode]);
+        renderTables();
+      });
+    });
+
+    function renderTables() {
+      saveSorts();
+      const container = document.getElementById('tablesContainer');
+      const cats = state.catMode === 'ALL' ? ['MURID', 'GURU', 'AKP'] : [state.catMode];
+      container.innerHTML = cats.map(cat => buildCategorySectionHtml(cat)).join('');
+      bindTableEvents(cats);
+    }
+
+    function buildCategorySectionHtml(cat) {
+      const dataset = state.currentSchool.data[cat] || { headers: [], rows: [] };
+      const headers = dataset.headers || [];
+      const allRows = dataset.rows || [];
+      const chosen = (state.selectedCols[cat] || []).filter(c => headers.includes(c));
+      const activeCols = chosen.length ? chosen : headers.slice(0, Math.min(6, headers.length));
+      const colIndexes = activeCols.map(c => headers.indexOf(c));
+
+      const ts = state.tableState[cat];
+      const q = ts.search.trim().toLowerCase();
+
+      // Tapisan gaya Excel bagi setiap kolum
+      let filtered = applyColumnFilters(cat, allRows, headers, null);
+
+      // Tapis carian dalam jadual
+      if (q) {
+        filtered = filtered.filter(row =>
+          colIndexes.some(idx => String(row[idx] || '').toLowerCase().includes(q))
+        );
+      }
+
+      // Susunan kolum gaya Excel (nombor, tarikh & teks dikenal pasti automatik)
+      const sortIdx = ts.sortKey ? headers.indexOf(ts.sortKey) : -1;
+      if (sortIdx >= 0) {
+        filtered = [...filtered].sort((a, b) => excelCompare(a[sortIdx], b[sortIdx], ts.sortAsc));
+      }
+      const activeFilterCount = Object.keys(ts.filters || {}).filter(k => headers.includes(k)).length;
+
+      // Halaman (Pagination)
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / ts.pageSize));
+      if (ts.page > totalPages) ts.page = totalPages;
+      const start = (ts.page - 1) * ts.pageSize;
+      const pageRows = filtered.slice(start, start + ts.pageSize);
+
+      const meta = CAT_META[cat];
+
+      let tableHtml = '';
+      if (!headers.length) {
+        tableHtml = `<div class="empty-state" style="padding:26px;">Tiada struktur data ditemui bagi kategori ${meta.label}.</div>`;
+      } else if (!total && (activeFilterCount || q)) {
+        tableHtml = `<div class="empty-state" style="padding:26px;">Tiada rekod sepadan dengan tapisan semasa. <button class="btn-3d btn-white btn-sm" data-clear-filters="${cat}" style="margin-left:8px;">✕ Kosongkan Tapisan</button></div>`;
+      } else if (!total) {
+        tableHtml = `<div class="empty-state" style="padding:26px;">Tiada rekod ${meta.label.toLowerCase()} ditemui bagi sekolah ini.</div>`;
+      } else {
+        tableHtml = `
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:52px;">Bil</th>
+                  ${activeCols.map((col) => {
+                    const isSorted = ts.sortKey === col;
+                    const isFiltered = !!(ts.filters && ts.filters[col]);
+                    const arrow = isSorted ? (ts.sortAsc ? '▲' : '▼') : '';
+                    const icon = isFiltered ? '⧩' : '▾';
+                    return `<th class="th-excel ${isSorted ? 'is-sorted' : ''} ${isFiltered ? 'is-filtered' : ''}">
+                      <div class="th-inner">
+                        <span class="th-label" data-sort-cat="${cat}" data-sort-key="${escapeHtml(col)}" title="Klik untuk susun">${escapeHtml(col)}</span>
+                        <span class="th-sort-ind">${arrow}</span>
+                        <button type="button" class="th-filter-btn" data-filter-cat="${cat}" data-filter-key="${escapeHtml(col)}" title="Susun & Tapis (gaya Excel)">${icon}</button>
+                      </div>
+                    </th>`;
+                  }).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${pageRows.map((row, rIdx) => `
+                  <tr>
+                    <td style="font-weight:700; color:var(--text-muted);">${start + rIdx + 1}</td>
+                    ${colIndexes.map(cIdx => `<td>${escapeHtml(row[cIdx] || '-')}</td>`).join('')}
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination-bar">
+            <span>Memaparkan <strong>${start + 1}–${Math.min(start + ts.pageSize, total)}</strong> daripada <strong>${total}</strong> rekod${total !== allRows.length ? ` (ditapis daripada ${allRows.length})` : ''} • ${activeCols.length} kolum</span>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <select class="select-3d" data-pagesize="${cat}" style="width:auto; padding:6px 10px; font-size:0.8rem;">
+                ${[25, 50, 100, 500].map(sz => `<option value="${sz}" ${ts.pageSize === sz ? 'selected' : ''}>${sz} / halaman</option>`).join('')}
+              </select>
+              <button class="btn-3d btn-white btn-sm" data-prev="${cat}" ${ts.page <= 1 ? 'disabled' : ''}>◀</button>
+              <span style="font-weight:700;">${ts.page} / ${totalPages}</span>
+              <button class="btn-3d btn-white btn-sm" data-next="${cat}" ${ts.page >= totalPages ? 'disabled' : ''}>▶</button>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="card-3d data-section">
+          <div class="data-section-header">
+            <div class="section-title-group">
+              <div class="section-pill" style="background:${meta.color};"></div>
+              <div>
+                <h3 style="font-size:1.02rem; font-weight:800;">${meta.label}</h3>
+                <span style="font-size:0.78rem; color:var(--text-muted);">${allRows.length} rekod keseluruhan</span>
+              </div>
+            </div>
+            <div class="section-tools">
+              <input type="text" class="input-3d mini-search" data-search="${cat}" value="${escapeHtml(ts.search)}" placeholder="Tapis dalam ${meta.label.toLowerCase()}..." />
+              ${(activeFilterCount || ts.sortKey) ? `<button class="btn-3d btn-white btn-sm" data-clear-filters="${cat}">✕ Kosongkan Susun/Tapis${activeFilterCount ? ` (${activeFilterCount})` : ''}</button>` : ''}
+              <button class="btn-3d btn-white btn-sm" data-open-cols="${cat}">⚙️ Pilih Kolum (${activeCols.length})</button>
+            </div>
+          </div>
+          ${tableHtml}
+        </div>
+      `;
+    }
+
+    function bindTableEvents(cats) {
+      cats.forEach(cat => {
+        const searchEl = document.querySelector(`[data-search="${cat}"]`);
+        if (searchEl) {
+          searchEl.addEventListener('input', (e) => {
+            state.tableState[cat].search = e.target.value;
+            state.tableState[cat].page = 1;
+            renderTables();
+            // Kekalkan fokus input carian
+            const refocused = document.querySelector(`[data-search="${cat}"]`);
+            if (refocused) {
+              refocused.focus();
+              refocused.setSelectionRange(refocused.value.length, refocused.value.length);
+            }
+          });
+        }
+
+        const colBtn = document.querySelector(`[data-open-cols="${cat}"]`);
+        if (colBtn) {
+          colBtn.addEventListener('click', () => openColumnModal(cat));
+        }
+
+        const psEl = document.querySelector(`[data-pagesize="${cat}"]`);
+        if (psEl) {
+          psEl.addEventListener('change', (e) => {
+            state.tableState[cat].pageSize = Number(e.target.value);
+            state.tableState[cat].page = 1;
+            renderTables();
+          });
+        }
+
+        const prevBtn = document.querySelector(`[data-prev="${cat}"]`);
+        if (prevBtn) {
+          prevBtn.addEventListener('click', () => {
+            state.tableState[cat].page = Math.max(1, state.tableState[cat].page - 1);
+            renderTables();
+          });
+        }
+
+        const nextBtn = document.querySelector(`[data-next="${cat}"]`);
+        if (nextBtn) {
+          nextBtn.addEventListener('click', () => {
+            state.tableState[cat].page++;
+            renderTables();
+          });
+        }
+      });
+
+      document.querySelectorAll('[data-sort-cat]').forEach(el => {
+        el.addEventListener('click', () => {
+          const cat = el.dataset.sortCat;
+          const key = el.dataset.sortKey;
+          const ts = state.tableState[cat];
+          // Kitaran: A→Z, Z→A, tiada susunan
+          if (ts.sortKey !== key) { ts.sortKey = key; ts.sortAsc = true; }
+          else if (ts.sortAsc) { ts.sortAsc = false; }
+          else { ts.sortKey = null; ts.sortAsc = true; }
+          renderTables();
+        });
+      });
+
+      document.querySelectorAll('[data-filter-cat]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cat = btn.dataset.filterCat;
+          const key = btn.dataset.filterKey;
+          if (filterMenu.classList.contains('open') && filterMenu.dataset.cat === cat && filterMenu.dataset.key === key) {
+            closeFilterMenu();
+          } else {
+            openFilterMenu(cat, key, btn);
+          }
+        });
+      });
+
+      document.querySelectorAll('[data-clear-filters]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const ts = state.tableState[btn.dataset.clearFilters];
+          ts.filters = {};
+          ts.sortKey = null;
+          ts.sortAsc = true;
+          ts.search = '';
+          ts.page = 1;
+          renderTables();
+        });
+      });
+    }
+
+    /* ========================================================================
+     * SUSUN & TAPIS GAYA EXCEL
+     * ======================================================================== */
+    function parseSortable(v) {
+      const s = String(v ?? '').trim();
+      if (s === '') return { t: 3, v: '' };
+      const num = s.replace(/,/g, '');
+      if (/^[-+]?\d*\.?\d+(e[-+]?\d+)?%?$/i.test(num)) {
+        return { t: 0, v: parseFloat(num) };
+      }
+      let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+      if (m) return { t: 1, v: new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime() };
+      m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (m) return { t: 1, v: new Date(+m[1], +m[2] - 1, +m[3]).getTime() };
+      return { t: 2, v: s };
+    }
+
+    // Seperti Excel: nombor/tarikh dahulu, kemudian teks; sel kosong sentiasa di bawah
+    function excelCompare(a, b, asc = true) {
+      return compareParsed(parseSortable(a), parseSortable(b), asc);
+    }
+    // Banding nilai yang telah diurai (lebih pantas untuk senarai besar)
+    function compareParsed(pa, pb, asc = true) {
+      if (pa.t === 3 || pb.t === 3) return pa.t === pb.t ? 0 : (pa.t === 3 ? 1 : -1);
+      const ra = pa.t === 2 ? 1 : 0, rb = pb.t === 2 ? 1 : 0;
+      let r;
+      if (ra !== rb) r = ra - rb;
+      else if (ra === 0) r = pa.v - pb.v;
+      else r = pa.v.localeCompare(pb.v, 'ms', { numeric: true, sensitivity: 'base' });
+      return asc ? r : -r;
+    }
+
+    function applyColumnFilters(cat, rows, headers, exceptKey) {
+      const filters = state.tableState[cat].filters || {};
+      const active = Object.keys(filters)
+        .filter(k => k !== exceptKey && headers.includes(k))
+        .map(k => ({ idx: headers.indexOf(k), set: filters[k] }));
+      if (!active.length) return rows;
+      return rows.filter(r => active.every(f => f.set.has(String(r[f.idx] ?? '').trim())));
+    }
+
+    const filterMenu = document.createElement('div');
+    filterMenu.className = 'filter-menu';
+    filterMenu.id = 'colFilterMenu';
+    document.body.appendChild(filterMenu);
+
+    function closeFilterMenu() {
+      filterMenu.classList.remove('open');
+      filterMenu.dataset.cat = '';
+      filterMenu.dataset.key = '';
+    }
+
+    function openFilterMenu(cat, key, anchorEl) {
+      const ds = state.currentSchool?.data[cat];
+      if (!ds) return;
+      const headers = ds.headers || [];
+      const idx = headers.indexOf(key);
+      if (idx === -1) return;
+      const ts = state.tableState[cat];
+
+      // Senarai nilai mengambil kira tapisan kolum lain (sama seperti Excel)
+      const baseRows = applyColumnFilters(cat, ds.rows || [], headers, key);
+      const counts = new Map();
+      baseRows.forEach(r => {
+        const v = String(r[idx] ?? '').trim();
+        counts.set(v, (counts.get(v) || 0) + 1);
+      });
+      const values = [...counts.keys()].sort((a, b) => excelCompare(a, b, true));
+      const current = ts.filters[key];
+
+      filterMenu.dataset.cat = cat;
+      filterMenu.dataset.key = key;
+      filterMenu.innerHTML = `
+        <div class="fm-title" title="${escapeHtml(key)}">${escapeHtml(key)}</div>
+        <button type="button" class="fm-item ${ts.sortKey === key && ts.sortAsc ? 'active' : ''}" data-fm-sort="asc">↑ Susun A → Z / Kecil → Besar</button>
+        <button type="button" class="fm-item ${ts.sortKey === key && !ts.sortAsc ? 'active' : ''}" data-fm-sort="desc">↓ Susun Z → A / Besar → Kecil</button>
+        ${ts.sortKey === key ? '<button type="button" class="fm-item" data-fm-sort="none">✕ Buang Susunan</button>' : ''}
+        <div class="fm-sep"></div>
+        ${current ? '<button type="button" class="fm-item" data-fm-clear="1">⧩ Kosongkan Tapisan Kolum Ini</button>' : ''}
+        <input type="text" class="fm-search" placeholder="Cari nilai..." />
+        <div class="fm-list">
+          <label class="fm-check"><input type="checkbox" data-fm-all="1" /> <span class="v"><strong>(Pilih Semua)</strong></span></label>
+          ${values.map((v, i) => `
+            <label class="fm-check" data-fm-row="${escapeHtml(v.toUpperCase())}">
+              <input type="checkbox" data-fm-val="${i}" ${!current || current.has(v) ? 'checked' : ''} />
+              <span class="v" title="${escapeHtml(v)}">${v === '' ? '<em>(Kosong)</em>' : escapeHtml(v)}</span>
+              <span class="c">${counts.get(v)}</span>
+            </label>`).join('')}
+        </div>
+        <div class="fm-actions">
+          <button type="button" class="btn-3d btn-white btn-sm" data-fm-cancel="1">Batal</button>
+          <button type="button" class="btn-3d btn-primary btn-sm" data-fm-ok="1">OK</button>
+        </div>
+      `;
+
+      const valBoxes = () => [...filterMenu.querySelectorAll('[data-fm-val]')];
+      const allBox = filterMenu.querySelector('[data-fm-all]');
+      const syncAll = () => {
+        const vis = valBoxes().filter(cb => cb.closest('.fm-check').style.display !== 'none');
+        const n = vis.filter(cb => cb.checked).length;
+        allBox.checked = vis.length > 0 && n === vis.length;
+        allBox.indeterminate = n > 0 && n < vis.length;
+      };
+      syncAll();
+
+      allBox.addEventListener('change', () => {
+        valBoxes().forEach(cb => {
+          if (cb.closest('.fm-check').style.display !== 'none') cb.checked = allBox.checked;
+        });
+        syncAll();
+      });
+      valBoxes().forEach(cb => cb.addEventListener('change', syncAll));
+
+      filterMenu.querySelector('.fm-search').addEventListener('input', (e) => {
+        const q = e.target.value.trim().toUpperCase();
+        filterMenu.querySelectorAll('[data-fm-row]').forEach(row => {
+          row.style.display = row.dataset.fmRow.includes(q) ? 'flex' : 'none';
+        });
+        // Seperti Excel: bila mencari, hanya nilai yang sepadan dipilih
+        if (q) valBoxes().forEach(cb => { cb.checked = cb.closest('.fm-check').style.display !== 'none'; });
+        syncAll();
+      });
+
+      filterMenu.querySelectorAll('[data-fm-sort]').forEach(b => b.addEventListener('click', () => {
+        const dir = b.dataset.fmSort;
+        if (dir === 'none') { ts.sortKey = null; ts.sortAsc = true; }
+        else { ts.sortKey = key; ts.sortAsc = dir === 'asc'; }
+        ts.page = 1;
+        closeFilterMenu();
+        renderTables();
+      }));
+
+      const clearBtn = filterMenu.querySelector('[data-fm-clear]');
+      if (clearBtn) clearBtn.addEventListener('click', () => {
+        delete ts.filters[key];
+        ts.page = 1;
+        closeFilterMenu();
+        renderTables();
+      });
+
+      filterMenu.querySelector('[data-fm-cancel]').addEventListener('click', closeFilterMenu);
+      filterMenu.querySelector('[data-fm-ok]').addEventListener('click', () => {
+        const chosen = valBoxes().filter(cb => cb.checked).map(cb => values[Number(cb.dataset.fmVal)]);
+        if (!chosen.length) {
+          showToast('Sila pilih sekurang-kurangnya satu nilai.', true);
+          return;
+        }
+        if (chosen.length === values.length) delete ts.filters[key];
+        else ts.filters[key] = new Set(chosen);
+        ts.page = 1;
+        closeFilterMenu();
+        renderTables();
+      });
+
+      filterMenu.classList.add('open');
+      const rect = anchorEl.getBoundingClientRect();
+      const mw = filterMenu.offsetWidth, mh = filterMenu.offsetHeight;
+      let left = Math.min(rect.right - mw, window.innerWidth - mw - 8);
+      left = Math.max(8, left);
+      let top = rect.bottom + 6;
+      if (top + mh > window.innerHeight - 8) top = Math.max(8, rect.top - mh - 6);
+      filterMenu.style.left = left + 'px';
+      filterMenu.style.top = top + 'px';
+      const searchEl = filterMenu.querySelector('.fm-search');
+      if (searchEl && window.matchMedia('(hover: hover) and (pointer: fine)').matches) searchEl.focus({ preventScroll: true });
+      filterMenu._openedAt = Date.now(); filterMenu._w = window.innerWidth;
+    }
+
+    document.addEventListener('click', (e) => {
+      if (filterMenu.classList.contains('open') && !filterMenu.contains(e.target) && !e.target.closest('.th-filter-btn')) {
+        closeFilterMenu();
+      }
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFilterMenu(); });
+    document.addEventListener('scroll', (e) => {
+      if (!filterMenu.classList.contains('open') || filterMenu.contains(e.target)) return;
+      if (Date.now() - (filterMenu._openedAt || 0) < 600) return;
+      if (document.activeElement && filterMenu.contains(document.activeElement)) return;
+      closeFilterMenu();
+    }, true);
+    window.addEventListener('resize', () => {
+      // Papan kekunci telefon ubah tinggi sahaja - jangan tutup menu
+      if (!filterMenu.classList.contains('open')) return;
+      if (Math.abs(window.innerWidth - (filterMenu._w || 0)) < 50) return;
+      closeFilterMenu();
+    });
+
+
+    /* ========================================================================
+     * CARIAN MELUAS (STATISTIK SELURUH NEGARA) - pilihan disimpan dalam peranti
+     * ======================================================================== */
+    (function () {
+      const LS = 'ds_adv_v1';
+      let adv = { cats: ['MURID'], conds: [{ col: '', mode: 'in', value: '', values: [] }], groupBy: '', open: false };
+      try { adv = Object.assign(adv, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
+      const save = () => { try { localStorage.setItem(LS, JSON.stringify(adv)); } catch (e) {} };
+      const det = document.getElementById('advDetails');
+      det.open = !!adv.open;
+      det.addEventListener('toggle', () => { adv.open = det.open; save(); if (det.open) renderAdv(); });
+
+      function allCols() {
+        const set = new Set();
+        adv.cats.forEach(c => (state.metadata.headers[c] || []).forEach(h => h && set.add(h)));
+        return [...set];
+      }
+      function opts(cols, sel, blank) {
+        return (blank ? `<option value="">${blank}</option>` : '') +
+          cols.map(c => `<option value="${escapeHtml(c)}" ${c === sel ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+      }
+      /* ---------- Syarat: label, ringkasan & keterangan ---------- */
+      const normV = v => String(v == null ? '' : v).replace(/[\u00A0\u2007\u202F\u200B\u200C\u200D\uFEFF]/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+      const showV = v => (v === '' ? '(Kosong)' : v);
+      function modeLabel(c) {
+        if (c.mode === 'in') return (c.values || []).length ? `☑ ${(c.values || []).length} dipilih` : '☑ Pilih nilai';
+        return c.mode === 'equals' ? 'sama dengan' : c.mode === 'notempty' ? 'tidak kosong' : 'mengandungi';
+      }
+      function valsSummary(c) {
+        const v = c.values || [];
+        if (!c.col) return '<em>Pilih kolum dahulu</em>';
+        if (!v.length) return '<em>(Semua) — klik untuk tick nilai</em>';
+        const head = v.slice(0, 3).map(x => escapeHtml(showV(x))).join(', ');
+        return head + (v.length > 3 ? ` <em>+${v.length - 3} lagi</em>` : '');
+      }
+      function isValidCond(c) {
+        if (!c || !c.col) return false;
+        if (c.mode === 'in') return (c.values || []).length > 0;
+        if (c.mode === 'notempty') return true;
+        return String(c.value || '').trim() !== '';
+      }
+      function validConds(exceptIdx) {
+        return adv.conds
+          .map((c, i) => ({ c, i }))
+          .filter(o => o.i !== exceptIdx && isValidCond(o.c))
+          .map(({ c }) => c.mode === 'in'
+            ? { col: c.col, mode: 'in', values: c.values.slice() }
+            : { col: c.col, mode: c.mode || 'contains', value: String(c.value || '') });
+      }
+      function describeCond(c) {
+        if (c.mode === 'in') {
+          const v = c.values || [];
+          const shown = v.slice(0, 5).map(x => `"${showV(x)}"`).join(' atau ');
+          return `${c.col} = ${shown}${v.length > 5 ? ` (+${v.length - 5} nilai lagi)` : ''}`;
+        }
+        if (c.mode === 'notempty') return `${c.col} tidak kosong`;
+        return `${c.col} ${c.mode === 'equals' ? '=' : 'mengandungi'} "${c.value}"`;
+      }
+      const describeAll = conds => conds.length ? conds.map(describeCond).join(' DAN ') : 'Semua rekod';
+
+      /* ---------- MENU TICK NILAI (gaya tapisan Excel) ---------- */
+      const advMenu = document.createElement('div');
+      advMenu.className = 'filter-menu adv-menu';
+      document.body.appendChild(advMenu);
+      const dvCache = new Map();
+      let menuSeq = 0;
+      function closeAdvMenu() { advMenu.classList.remove('open'); advMenu.dataset.ci = ''; menuSeq++; }
+      function placeAdvMenu(i) {
+        const anchor = document.querySelector(`#advConds .adv-mode-btn[data-cmenu="${i}"]`);
+        if (!anchor) return;
+        const rect = anchor.getBoundingClientRect();
+        const mw = advMenu.offsetWidth, mh = advMenu.offsetHeight;
+        let left = Math.max(8, Math.min(rect.left, window.innerWidth - mw - 8));
+        let top = rect.bottom + 6;
+        if (top + mh > window.innerHeight - 8) top = Math.max(8, Math.min(rect.top - mh - 6, window.innerHeight - mh - 8));
+        advMenu.style.left = left + 'px';
+        advMenu.style.top = top + 'px';
+      }
+      document.addEventListener('click', (e) => {
+        if (!advMenu.classList.contains('open') || !e.target.isConnected) return;
+        if (!advMenu.contains(e.target) && !e.target.closest('[data-cmenu]')) closeAdvMenu();
+      });
+      document.addEventListener('scroll', (e) => {
+        if (advMenu.classList.contains('open') && !advMenu.contains(e.target)) placeAdvMenu(advMenu.dataset.ci);
+      }, true);
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && advMenu.classList.contains('open')) closeAdvMenu(); });
+      window.addEventListener('resize', () => { if (advMenu.classList.contains('open')) placeAdvMenu(advMenu.dataset.ci); });
+
+      async function fetchDistinct(col, others, search) {
+        const key = JSON.stringify([adv.cats, col, others, search]);
+        if (dvCache.has(key)) return dvCache.get(key);
+        const p = callGAS({ action: 'distinctValues', categories: adv.cats, col, conditions: others, search, limit: 3000 })
+          .catch(err => { dvCache.delete(key); throw err; });
+        dvCache.set(key, p);
+        return p;
+      }
+
+      function openCondMenu(i) {
+        const c = adv.conds[i];
+        if (!c) return;
+        const seq = ++menuSeq;
+        advMenu.dataset.ci = String(i);
+        const modes = [['in', '☑ Pilih & tick nilai'], ['contains', 'Mengandungi teks'], ['equals', 'Sama dengan teks'], ['notempty', 'Tidak kosong']];
+        advMenu.innerHTML = `
+          <div class="fm-title" title="${escapeHtml(c.col || '')}">${escapeHtml(c.col || 'Syarat')}</div>
+          <div class="fm-modes">${modes.map(([m, l]) => `<button type="button" class="fm-item ${c.mode === m ? 'active' : ''}" data-am="${m}">${l}</button>`).join('')}</div>
+          <div class="fm-sep"></div>
+          <div data-am-body></div>`;
+        advMenu.querySelectorAll('[data-am]').forEach(b => b.addEventListener('click', () => {
+          const m = b.dataset.am;
+          if (m === 'in') {
+            if (c.mode !== 'in') { c.mode = 'in'; c.values = []; save(); renderAdv(); }
+            openCondMenu(i);
+            return;
+          }
+          c.mode = m; save(); renderAdv(); closeAdvMenu();
+          const inp = document.querySelector(`#advConds input[data-ci="${i}"][data-f="value"]`);
+          if (inp && !inp.disabled) inp.focus();
+        }));
+        const body = advMenu.querySelector('[data-am-body]');
+        advMenu.classList.add('open');
+
+        if (c.mode !== 'in') {
+          body.innerHTML = `<div class="fm-note">Mod teks: taip nilai dalam kotak di sebelah. Pilih <b>☑ Pilih & tick nilai</b> untuk senarai nilai sebenar seperti Excel.</div>`;
+          placeAdvMenu(i); return;
+        }
+        if (!c.col) {
+          body.innerHTML = `<div class="fm-note warn">Sila pilih kolum dahulu di kotak sebelah kiri.</div>`;
+          placeAdvMenu(i); return;
+        }
+        if (!adv.cats.length) {
+          body.innerHTML = `<div class="fm-note warn">Sila tick sekurang-kurangnya satu data (Murid / Guru / AKP).</div>`;
+          placeAdvMenu(i); return;
+        }
+
+        const others = validConds(i);
+        const prevSel = new Set((c.values || []).map(normV));
+        const startAll = prevSel.size === 0;
+        let values = [], truncated = false, touched = false, serverSearch = '', searchTimer = null;
+
+        body.innerHTML = `
+          <input type="text" class="fm-search" placeholder="Cari nilai..." />
+          <div class="fm-note" data-am-note></div>
+          <div class="fm-list" data-am-list><div class="fm-load">⏳ Memuatkan nilai sebenar daripada data...</div></div>
+          <div class="fm-actions">
+            <button type="button" class="btn-3d btn-white btn-sm" data-am-cancel>Batal</button>
+            <button type="button" class="btn-3d btn-primary btn-sm" data-am-ok disabled>OK</button>
+          </div>`;
+        const listEl = body.querySelector('[data-am-list]');
+        const noteEl = body.querySelector('[data-am-note]');
+        const searchEl = body.querySelector('.fm-search');
+        const okBtn = body.querySelector('[data-am-ok]');
+        placeAdvMenu(i);
+        if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) searchEl.focus({ preventScroll: true });
+
+        const boxes = () => [...listEl.querySelectorAll('[data-av]')];
+        const visible = cb => cb.closest('.fm-check').style.display !== 'none';
+        function syncAll() {
+          const all = listEl.querySelector('[data-av-all]');
+          if (!all) return;
+          const vis = boxes().filter(visible);
+          const n = vis.filter(cb => cb.checked).length;
+          all.checked = vis.length > 0 && n === vis.length;
+          all.indeterminate = n > 0 && n < vis.length;
+        }
+        function renderValues(checkAll) {
+          if (!values.length) { listEl.innerHTML = `<div class="fm-load">Tiada nilai ditemui.</div>`; return; }
+          listEl.innerHTML = `<label class="fm-check"><input type="checkbox" data-av-all="1" /> <span class="v"><strong>(Pilih Semua)</strong></span></label>` +
+            values.map(([v, n], k) => `
+              <label class="fm-check" data-av-row="${escapeHtml(normV(v))}">
+                <input type="checkbox" data-av="${k}" ${checkAll || prevSel.has(normV(v)) ? 'checked' : ''} />
+                <span class="v" title="${escapeHtml(v)}">${v === '' ? '<em>(Kosong)</em>' : escapeHtml(v)}</span>
+                <span class="c">${Number(n).toLocaleString('ms-MY')}</span>
+              </label>`).join('');
+          listEl.querySelector('[data-av-all]').addEventListener('change', (e) => {
+            touched = true;
+            boxes().forEach(cb => { if (visible(cb)) cb.checked = e.target.checked; });
+            syncAll();
+          });
+          boxes().forEach(cb => cb.addEventListener('change', () => { touched = true; syncAll(); }));
+          syncAll();
+        }
+        function setNote(res) {
+          const parts = [];
+          const total = Number(res.distinct || 0).toLocaleString('ms-MY');
+          if (res.truncated) parts.push(`⚠️ Terlalu banyak nilai (${total}). Dipaparkan ${values.length.toLocaleString('ms-MY')} yang paling kerap — <b>taip dalam kotak cari</b> untuk cari nilai lain.`);
+          else parts.push(`${total} nilai unik${others.length ? ' (mengikut syarat lain)' : ''}. Nombor di kanan = bilangan rekod.`);
+          if ((res.missingIn || []).length) parts.push(`Kolum ini tiada dalam data: ${res.missingIn.map(x => CAT_META[x] ? CAT_META[x].label.replace('Senarai ', '') : x).join(', ')}.`);
+          noteEl.className = 'fm-note' + (res.truncated || (res.missingIn || []).length ? ' warn' : '');
+          noteEl.innerHTML = parts.join('<br>');
+        }
+        const sortVals = arr => arr.slice().sort((a, b) => {
+          if (a[0] === '' && b[0] !== '') return 1;
+          if (b[0] === '' && a[0] !== '') return -1;
+          return collator.compare(a[0], b[0]);
+        });
+        async function load(search, checkAll) {
+          listEl.innerHTML = `<div class="fm-load">⏳ Memuatkan nilai sebenar daripada data...</div>`;
+          okBtn.disabled = true;
+          try {
+            const res = await fetchDistinct(c.col, others, search);
+            if (seq !== menuSeq) return;
+            values = sortVals(res.values || []);
+            if (!search) truncated = !!res.truncated;
+            serverSearch = search;
+            setNote(res);
+            renderValues(checkAll);
+            okBtn.disabled = false;
+          } catch (err) {
+            if (seq !== menuSeq) return;
+            const msg = err.message || String(err);
+            const hint = /Tindakan tidak dikenali/i.test(msg) ? '<br><small>Sila kemas kini code.gs dan buat <b>Deploy → Manage deployments → Edit → New version</b>.</small>' : '';
+            listEl.innerHTML = `<div class="fm-load" style="color:#dc2626;">Gagal ambil nilai: ${escapeHtml(msg)}${hint}</div>`;
+          }
+          placeAdvMenu(i);
+        }
+        load('', startAll);
+
+        searchEl.addEventListener('input', () => {
+          touched = true;
+          const q = normV(searchEl.value);
+          if (truncated) {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => { if (seq === menuSeq) load(q, true); }, 450);
+            return;
+          }
+          // Seperti Excel: bila mencari, hanya nilai yang sepadan dipilih
+          boxes().forEach(cb => {
+            const row = cb.closest('.fm-check');
+            const show = row.dataset.avRow.includes(q);
+            row.style.display = show ? 'flex' : 'none';
+            if (q) cb.checked = show;
+          });
+          syncAll();
+        });
+
+        body.querySelector('[data-am-cancel]').addEventListener('click', closeAdvMenu);
+        okBtn.addEventListener('click', () => {
+          if (!touched) { closeAdvMenu(); return; }
+          const q = normV(searchEl.value);
+          const chosen = boxes().filter(cb => cb.checked && visible(cb)).map(cb => values[Number(cb.dataset.av)][0]);
+          if (!chosen.length) { showToast('Sila tick sekurang-kurangnya satu nilai.', true); return; }
+          const allPicked = !truncated && !q && !serverSearch && chosen.length === values.length;
+          c.mode = 'in';
+          c.values = allPicked ? [] : chosen;
+          save(); closeAdvMenu(); renderAdv();
+        });
+      }
+
+      function renderAdv() {
+        document.querySelectorAll('[data-adv-cat]').forEach(cb => { cb.checked = adv.cats.includes(cb.dataset.advCat); });
+        const cols = allCols();
+        document.getElementById('advConds').innerHTML = adv.conds.map((c, i) => `
+          <div class="adv-cond">
+            <select class="select-3d adv-sel" data-ci="${i}" data-f="col">${opts(cols, c.col, '— Pilih kolum —')}</select>
+            <button type="button" class="select-3d adv-pick adv-mode-btn ${c.mode === 'in' && (c.values || []).length ? 'is-active' : ''}" data-cmenu="${i}" title="Klik untuk pilih & tick nilai (seperti tapisan Excel)">
+              <span class="t">${escapeHtml(modeLabel(c))}</span><span class="k">▾</span>
+            </button>
+            ${c.mode === 'in'
+              ? `<button type="button" class="input-3d adv-pick adv-vals-btn" data-cmenu="${i}" title="${escapeHtml((c.values || []).join(', '))}"><span class="t">${valsSummary(c)}</span><span class="k">✎</span></button>`
+              : `<input class="input-3d" data-ci="${i}" data-f="value" value="${escapeHtml(c.value || '')}" placeholder="Contoh: OKU, PEREMPUAN, KEDAH" ${c.mode === 'notempty' ? 'disabled' : ''}>`}
+            <button type="button" class="btn-3d btn-white btn-sm" data-cdel="${i}" title="Buang syarat">✕</button>
+          </div>`).join('') || '<div style="color:#64748b;font-size:.9rem;">Tiada syarat — akan kira semua rekod.</div>';
+        document.getElementById('advGroup').innerHTML = opts(cols, adv.groupBy, 'Tiada (jumlah sahaja)');
+        document.querySelectorAll('#advConds [data-ci]').forEach(el => el.addEventListener('change', () => {
+          const c = adv.conds[+el.dataset.ci];
+          c[el.dataset.f] = el.value;
+          if (el.dataset.f === 'col') { c.values = []; renderAdv(); }
+          save();
+        }));
+        document.querySelectorAll('#advConds [data-cmenu]').forEach(b => b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const i = +b.dataset.cmenu;
+          if (advMenu.classList.contains('open') && advMenu.dataset.ci === String(i)) { closeAdvMenu(); return; }
+          openCondMenu(i);
+        }));
+        document.querySelectorAll('#advConds [data-cdel]').forEach(b => b.addEventListener('click', () => {
+          adv.conds.splice(+b.dataset.cdel, 1); save(); renderAdv();
+        }));
+      }
+      window.renderAdvPanel = renderAdv;
+
+      /* ---------- SENARAI REKOD: jadual biasa + susun + cetak + Excel + PDF ---------- */
+      let lastRun = null;
+      let list = null; // { cat, headers, rows, count, total, truncated, sortIdx, asc, page, pageSize }
+      adv.listCols = adv.listCols || {};
+      adv.listLimit = adv.listLimit || 5000;
+      const collator = new Intl.Collator('ms', { numeric: true, sensitivity: 'base' });
+      const fmtN = n => Number(n).toLocaleString('ms-MY');
+      const todayStr = () => new Date().toISOString().slice(0, 10);
+
+      function defaultListCols(cat) {
+        const heads = state.metadata.headers[cat] || [];
+        const pick = [];
+        const add = c => { if (c && heads.includes(c) && !pick.includes(c)) pick.push(c); };
+        heads.filter(h => /^KOD_?SEKOLAH$/i.test(h) || /^NAMA_?SEKOLAH$/i.test(h) || /^NEGERI$/i.test(h) || /^PPD$/i.test(h)).forEach(add);
+        ((state.selectedCols[cat] && state.selectedCols[cat].length) ? state.selectedCols[cat] : DEFAULT_COLS[cat]).forEach(add);
+        (lastRun ? lastRun.conds : []).forEach(c => add(c.col));
+        return pick.length ? pick : heads.slice(0, 10);
+      }
+      function listColsFor(cat) {
+        const heads = state.metadata.headers[cat] || [];
+        const saved = (adv.listCols[cat] || []).filter(c => heads.includes(c));
+        return saved.length ? saved : defaultListCols(cat);
+      }
+
+      // Simpanan senarai dalam pelayar: permintaan sama tidak dihantar dua kali,
+      // dan senarai mula diambil di belakang tabir sebaik sahaja jumlah dikira.
+      const rowsCache = new Map(); // kunci -> { p: Promise, t: masa }
+      const ROWS_TTL = 10 * 60 * 1000;
+      function rowsKey(cat) {
+        return JSON.stringify([state.metadata.dataVer || '', cat, lastRun ? lastRun.conds : [], listColsFor(cat), adv.listLimit]);
+      }
+      function fetchRows(cat, force) {
+        const key = rowsKey(cat);
+        const hit = rowsCache.get(key);
+        if (hit && !force && Date.now() - hit.t < ROWS_TTL) return hit.p;
+        const p = callGAS({ action: 'queryRows', category: cat, conditions: lastRun.conds, columns: listColsFor(cat), limit: adv.listLimit, refresh: !!force });
+        const entry = { p, t: Date.now(), done: false };
+        rowsCache.set(key, entry);
+        p.then(() => { entry.done = true; }, () => { if (rowsCache.get(key) === entry) rowsCache.delete(key); });
+        if (rowsCache.size > 12) rowsCache.delete(rowsCache.keys().next().value);
+        return p;
+      }
+      function prefetchRows(cats) {
+        cats.forEach(cat => { try { fetchRows(cat).catch(() => {}); } catch (e) {} });
+      }
+
+      let loadToken = 0;
+      async function loadList(cat, force) {
+        if (!lastRun) return;
+        const box = document.getElementById('advList');
+        if (!box) return;
+        closeFilterMenu();
+        const token = ++loadToken;
+        const entry = rowsCache.get(rowsKey(cat));
+        const ready = !force && entry && entry.done && Date.now() - entry.t < ROWS_TTL;
+        let timer = null;
+        if (!ready) {
+          const label = CAT_META[cat].label.replace('Senarai ', '');
+          const t0 = Date.now();
+          box.innerHTML = `<div class="adv-list"><div style="color:#64748b;display:flex;align-items:center;gap:10px;"><span class="spinner" style="width:18px;height:18px;border-width:3px;"></span><span>Mengambil senarai ${label}... <b data-adv-elapsed>0</b> saat</span></div></div>`;
+          box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          timer = setInterval(() => {
+            const el = box.querySelector('[data-adv-elapsed]');
+            if (el) el.textContent = Math.round((Date.now() - t0) / 1000); else clearInterval(timer);
+          }, 1000);
+        }
+        try {
+          const res = await fetchRows(cat, force);
+          if (token !== loadToken) return; // pengguna sudah tekan butang lain
+          list = { cat, headers: res.headers || [], rows: res.rows || [], count: res.count || 0, total: res.total || 0, truncated: !!res.truncated, sortIdx: -1, asc: true, filters: {}, page: 1, pageSize: (list && list.pageSize) || 100 };
+          renderList();
+          if (ready) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (err) {
+          if (token !== loadToken) return;
+          const msg = err.message || String(err);
+          const hint = /Tindakan tidak dikenali/i.test(msg) ? '<br><small>Sila kemas kini code.gs dan buat <b>Deploy → Manage deployments → Edit → New version</b>.</small>' : '';
+          box.innerHTML = `<div class="adv-list" style="color:#dc2626;">Gagal ambil senarai: ${escapeHtml(msg)}${hint} <button type="button" class="btn-3d btn-white btn-sm" data-adv-retry style="margin-left:8px;">↻ Cuba Lagi</button></div>`;
+          const rb = box.querySelector('[data-adv-retry]');
+          if (rb) rb.addEventListener('click', () => loadList(cat, true));
+        } finally {
+          if (timer) clearInterval(timer);
+        }
+      }
+
+      // Tapisan gaya Excel bagi senarai (kecuali satu kolum - untuk senarai nilai menu)
+      function listFilteredRows(exceptIdx) {
+        if (!list) return [];
+        const f = list.filters || {};
+        const active = Object.keys(f).map(Number).filter(i => i !== exceptIdx && i < list.headers.length).map(i => ({ i, set: f[i] }));
+        if (!active.length) return list.rows;
+        return list.rows.filter(r => active.every(a => a.set.has(String(r[a.i] ?? '').trim())));
+      }
+      function listFilterCount() { return list ? Object.keys(list.filters || {}).length : 0; }
+
+      // Susun gaya Excel: nombor & tarikh dikenal pasti, sel kosong sentiasa di bawah
+      let filterSetSeq = 0;
+      function sortedRows() {
+        if (!list) return [];
+        const f = list.filters || {};
+        const sig = list.sortIdx + '|' + list.asc + '|' + Object.keys(f).map(k => k + ':' + (f[k]._id || (f[k]._id = ++filterSetSeq))).join(',');
+        if (list._view && list._viewSig === sig) return list._view; // tukar halaman tidak perlu susun semula
+        const rows = listFilteredRows(-1);
+        let view = rows;
+        if (list.sortIdx >= 0) {
+          const i = list.sortIdx, asc = list.asc;
+          view = rows.map(r => ({ r, k: parseSortable(r[i]) }))
+            .sort((a, b) => compareParsed(a.k, b.k, asc))
+            .map(x => x.r);
+        }
+        list._view = view; list._viewSig = sig;
+        return view;
+      }
+
+      function openAdvFilterMenu(i, anchorEl) {
+        if (!list) return;
+        const key = list.headers[i];
+        const counts = new Map();
+        listFilteredRows(i).forEach(r => {
+          const v = String(r[i] ?? '').trim();
+          counts.set(v, (counts.get(v) || 0) + 1);
+        });
+        const values = [...counts.keys()].sort((a, b) => excelCompare(a, b, true));
+        const current = list.filters[i];
+        const isSorted = list.sortIdx === i;
+
+        filterMenu.dataset.cat = 'ADV';
+        filterMenu.dataset.key = String(i);
+        filterMenu.innerHTML = `
+          <div class="fm-title" title="${escapeHtml(key)}">${escapeHtml(key)}</div>
+          <button type="button" class="fm-item ${isSorted && list.asc ? 'active' : ''}" data-fm-sort="asc">↑ Susun A → Z / Kecil → Besar</button>
+          <button type="button" class="fm-item ${isSorted && !list.asc ? 'active' : ''}" data-fm-sort="desc">↓ Susun Z → A / Besar → Kecil</button>
+          ${isSorted ? '<button type="button" class="fm-item" data-fm-sort="none">✕ Buang Susunan</button>' : ''}
+          <div class="fm-sep"></div>
+          ${current ? '<button type="button" class="fm-item" data-fm-clear="1">⧩ Kosongkan Tapisan Kolum Ini</button>' : ''}
+          <input type="text" class="fm-search" placeholder="Cari nilai..." />
+          <div class="fm-list">
+            <label class="fm-check"><input type="checkbox" data-fm-all="1" /> <span class="v"><strong>(Pilih Semua)</strong></span></label>
+            ${values.map((v, k) => `
+              <label class="fm-check" data-fm-row="${escapeHtml(v.toUpperCase())}">
+                <input type="checkbox" data-fm-val="${k}" ${!current || current.has(v) ? 'checked' : ''} />
+                <span class="v" title="${escapeHtml(v)}">${v === '' ? '<em>(Kosong)</em>' : escapeHtml(v)}</span>
+                <span class="c">${fmtN(counts.get(v))}</span>
+              </label>`).join('')}
+          </div>
+          <div class="fm-actions">
+            <button type="button" class="btn-3d btn-white btn-sm" data-fm-cancel="1">Batal</button>
+            <button type="button" class="btn-3d btn-primary btn-sm" data-fm-ok="1">OK</button>
+          </div>
+        `;
+
+        const valBoxes = () => [...filterMenu.querySelectorAll('[data-fm-val]')];
+        const allBox = filterMenu.querySelector('[data-fm-all]');
+        const syncAll = () => {
+          const vis = valBoxes().filter(cb => cb.closest('.fm-check').style.display !== 'none');
+          const n = vis.filter(cb => cb.checked).length;
+          allBox.checked = vis.length > 0 && n === vis.length;
+          allBox.indeterminate = n > 0 && n < vis.length;
+        };
+        syncAll();
+        allBox.addEventListener('change', () => {
+          valBoxes().forEach(cb => { if (cb.closest('.fm-check').style.display !== 'none') cb.checked = allBox.checked; });
+          syncAll();
+        });
+        valBoxes().forEach(cb => cb.addEventListener('change', syncAll));
+        filterMenu.querySelector('.fm-search').addEventListener('input', (e) => {
+          const q = e.target.value.trim().toUpperCase();
+          filterMenu.querySelectorAll('[data-fm-row]').forEach(row => { row.style.display = row.dataset.fmRow.includes(q) ? 'flex' : 'none'; });
+          if (q) valBoxes().forEach(cb => { cb.checked = cb.closest('.fm-check').style.display !== 'none'; });
+          syncAll();
+        });
+        filterMenu.querySelectorAll('[data-fm-sort]').forEach(b => b.addEventListener('click', () => {
+          const dir = b.dataset.fmSort;
+          if (dir === 'none') { list.sortIdx = -1; list.asc = true; }
+          else { list.sortIdx = i; list.asc = dir === 'asc'; }
+          list.page = 1; closeFilterMenu(); renderList();
+        }));
+        const clearBtn = filterMenu.querySelector('[data-fm-clear]');
+        if (clearBtn) clearBtn.addEventListener('click', () => { delete list.filters[i]; list.page = 1; closeFilterMenu(); renderList(); });
+        filterMenu.querySelector('[data-fm-cancel]').addEventListener('click', closeFilterMenu);
+        filterMenu.querySelector('[data-fm-ok]').addEventListener('click', () => {
+          const chosen = valBoxes().filter(cb => cb.checked).map(cb => values[Number(cb.dataset.fmVal)]);
+          if (!chosen.length) { showToast('Sila pilih sekurang-kurangnya satu nilai.', true); return; }
+          if (chosen.length === values.length) delete list.filters[i];
+          else list.filters[i] = new Set(chosen);
+          list.page = 1; closeFilterMenu(); renderList();
+        });
+
+        filterMenu.classList.add('open');
+        const rect = anchorEl.getBoundingClientRect();
+        const mw = filterMenu.offsetWidth, mh = filterMenu.offsetHeight;
+        let left = Math.max(8, Math.min(rect.right - mw, window.innerWidth - mw - 8));
+        let top = rect.bottom + 6;
+        if (top + mh > window.innerHeight - 8) top = Math.max(8, rect.top - mh - 6);
+        filterMenu.style.left = left + 'px';
+        filterMenu.style.top = top + 'px';
+        const se = filterMenu.querySelector('.fm-search');
+        if (se && window.matchMedia('(hover: hover) and (pointer: fine)').matches) se.focus({ preventScroll: true });
+        filterMenu._openedAt = Date.now(); filterMenu._w = window.innerWidth;
+      }
+
+      function renderList() {
+        const box = document.getElementById('advList');
+        if (!box || !list) return;
+        const meta = CAT_META[list.cat];
+        const rows = sortedRows();
+        const all = list.pageSize === 0;
+        const pages = all ? 1 : Math.max(1, Math.ceil(rows.length / list.pageSize));
+        list.page = Math.min(Math.max(1, list.page), pages);
+        const start = all ? 0 : (list.page - 1) * list.pageSize;
+        const pageRows = all ? rows : rows.slice(start, start + list.pageSize);
+        const heads = state.metadata.headers[list.cat] || list.headers;
+        const chosen = new Set(list.headers);
+        box.innerHTML = `
+          <div class="adv-list" style="border-top:4px solid ${meta.color}">
+            <div class="adv-list-head">
+              <div>
+                <div class="adv-list-title">${meta.label} — ${fmtN(list.count)} rekod</div>
+                <div class="adv-list-sub">Syarat: ${escapeHtml(lastRun ? lastRun.desc : '')}${list.sortIdx >= 0 ? ` • Disusun ikut ${escapeHtml(list.headers[list.sortIdx])} (${list.asc ? 'A→Z' : 'Z→A'})` : ' • Klik tajuk kolum untuk susun, atau ▾ untuk susun & tapis'}${listFilterCount() ? ` • ${listFilterCount()} tapisan kolum aktif` : ''}</div>
+              </div>
+              <div class="adv-list-tools">
+                ${(listFilterCount() || list.sortIdx >= 0) ? `<button type="button" class="btn-3d btn-white btn-sm" data-adv-clear>✕ Kosongkan Susun/Tapis${listFilterCount() ? ` (${listFilterCount()})` : ''}</button>` : ''}
+                <details class="adv-cols">
+                  <summary class="btn-3d btn-white btn-sm">⚙️ Kolum (${list.headers.length})</summary>
+                  <div class="adv-cols-panel">
+                    <input type="text" class="input-3d" data-advcol-filter placeholder="Cari kolum..." style="padding:7px 10px;font-size:.82rem;">
+                    <div class="adv-cols-list">
+                      ${heads.map(h => `<label data-advcol-label="${escapeHtml(h.toUpperCase())}"><input type="checkbox" value="${escapeHtml(h)}" ${chosen.has(h) ? 'checked' : ''}> ${escapeHtml(h)}</label>`).join('')}
+                    </div>
+                    <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
+                      <button type="button" class="btn-3d btn-white btn-sm" data-advcol-default>Lalai</button>
+                      <button type="button" class="btn-3d btn-primary btn-sm" data-advcol-apply>✓ Guna</button>
+                    </div>
+                  </div>
+                </details>
+                <select class="select-3d" data-adv-limit title="Had rekod diambil">
+                  ${[1000, 5000, 20000, 60000].map(n => `<option value="${n}" ${adv.listLimit === n ? 'selected' : ''}>Had ${fmtN(n)} rekod</option>`).join('')}
+                </select>
+                <button type="button" class="btn-3d btn-white btn-sm" data-adv-print>🖨️ Cetak</button>
+                <button type="button" class="btn-3d btn-emerald btn-sm" data-adv-xlsx>📥 Excel</button>
+                <button type="button" class="btn-3d btn-white btn-sm" data-adv-pdf>📄 PDF</button>
+                <button type="button" class="btn-3d btn-white btn-sm" data-adv-close title="Tutup senarai">✕</button>
+              </div>
+            </div>
+            ${list.truncated ? `<div class="adv-warn">⚠️ Hanya <b>${fmtN(list.rows.length)}</b> daripada <b>${fmtN(list.count)}</b> rekod diambil. Tambah syarat carian atau naikkan had rekod untuk lihat semua.</div>` : ''}
+            ${!rows.length ? (listFilterCount() ? '<div class="empty-state" style="padding:22px;">Tiada rekod sepadan dengan tapisan semasa. <button type="button" class="btn-3d btn-white btn-sm" data-adv-clear style="margin-left:8px;">✕ Kosongkan Tapisan</button></div>' : '<div class="empty-state" style="padding:22px;">Tiada rekod.</div>') : `
+            <div class="table-wrapper" style="max-height:640px;overflow:auto;">
+              <table class="data-table">
+                <thead><tr>
+                  <th style="width:52px;">Bil</th>
+                  ${list.headers.map((h, i) => {
+                    const isSorted = list.sortIdx === i;
+                    const isFiltered = !!list.filters[i];
+                    return `<th class="th-excel ${isSorted ? 'is-sorted' : ''} ${isFiltered ? 'is-filtered' : ''}">
+                      <div class="th-inner">
+                        <span class="th-label" data-adv-sort="${i}" title="Klik untuk susun">${escapeHtml(h)}</span>
+                        <span class="th-sort-ind">${isSorted ? (list.asc ? '▲' : '▼') : ''}</span>
+                        <button type="button" class="th-filter-btn" data-adv-filter="${i}" title="Susun & Tapis (gaya Excel)">${isFiltered ? '⧩' : '▾'}</button>
+                      </div>
+                    </th>`;
+                  }).join('')}
+                </tr></thead>
+                <tbody>
+                  ${pageRows.map((r, k) => `<tr><td style="font-weight:700;color:var(--text-muted);">${start + k + 1}</td>${list.headers.map((_, i) => `<td>${escapeHtml(r[i] === '' || r[i] == null ? '-' : r[i])}</td>`).join('')}</tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination-bar">
+              <span>Memaparkan <strong>${fmtN(start + 1)}–${fmtN(start + pageRows.length)}</strong> daripada <strong>${fmtN(rows.length)}</strong> rekod${rows.length !== list.rows.length ? ` (ditapis daripada ${fmtN(list.rows.length)})` : ''} • ${list.headers.length} kolum</span>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <select class="select-3d" data-adv-pagesize style="width:auto;padding:6px 10px;font-size:.8rem;">
+                  ${[50, 100, 500, 1000, 0].map(n => `<option value="${n}" ${list.pageSize === n ? 'selected' : ''}>${n ? n + ' / halaman' : 'Semua'}</option>`).join('')}
+                </select>
+                <button type="button" class="btn-3d btn-white btn-sm" data-adv-prev ${list.page <= 1 ? 'disabled' : ''}>◀</button>
+                <span style="font-weight:700;">${list.page} / ${pages}</span>
+                <button type="button" class="btn-3d btn-white btn-sm" data-adv-next ${list.page >= pages ? 'disabled' : ''}>▶</button>
+              </div>
+            </div>`}
+          </div>`;
+
+        const q = sel => box.querySelector(sel);
+        box.querySelectorAll('[data-adv-sort]').forEach(th => th.addEventListener('click', () => {
+          const i = +th.dataset.advSort;
+          if (list.sortIdx === i) { if (list.asc) list.asc = false; else { list.sortIdx = -1; list.asc = true; } }
+          else { list.sortIdx = i; list.asc = true; }
+          list.page = 1; renderList();
+        }));
+        box.querySelectorAll('[data-adv-filter]').forEach(btn => btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const i = +btn.dataset.advFilter;
+          if (filterMenu.classList.contains('open') && filterMenu.dataset.cat === 'ADV' && filterMenu.dataset.key === String(i)) closeFilterMenu();
+          else openAdvFilterMenu(i, btn);
+        }));
+        box.querySelectorAll('[data-adv-clear]').forEach(b => b.addEventListener('click', () => {
+          list.filters = {}; list.sortIdx = -1; list.asc = true; list.page = 1; renderList();
+        }));
+        q('[data-adv-pagesize]') && q('[data-adv-pagesize]').addEventListener('change', e => { list.pageSize = +e.target.value; list.page = 1; renderList(); });
+        q('[data-adv-prev]') && q('[data-adv-prev]').addEventListener('click', () => { list.page--; renderList(); });
+        q('[data-adv-next]') && q('[data-adv-next]').addEventListener('click', () => { list.page++; renderList(); });
+        q('[data-adv-close]').addEventListener('click', () => { closeFilterMenu(); list = null; box.innerHTML = ''; });
+        q('[data-adv-limit]').addEventListener('change', e => { adv.listLimit = +e.target.value; save(); loadList(list.cat); });
+        q('[data-adv-print]').addEventListener('click', printList);
+        q('[data-adv-xlsx]').addEventListener('click', exportListXlsx);
+        q('[data-adv-pdf]').addEventListener('click', exportListPdf);
+        q('[data-advcol-filter]').addEventListener('input', e => {
+          const v = e.target.value.trim().toUpperCase();
+          box.querySelectorAll('[data-advcol-label]').forEach(l => { l.style.display = l.dataset.advcolLabel.includes(v) ? '' : 'none'; });
+        });
+        q('[data-advcol-default]').addEventListener('click', () => { delete adv.listCols[list.cat]; save(); loadList(list.cat); });
+        q('[data-advcol-apply]').addEventListener('click', () => {
+          const picked = [...box.querySelectorAll('.adv-cols-list input:checked')].map(x => x.value);
+          if (!picked.length) { showToast('Sila pilih sekurang-kurangnya satu kolum.', true); return; }
+          adv.listCols[list.cat] = picked; save(); loadList(list.cat);
+        });
+      }
+
+      function listTitle() { return `${CAT_META[list.cat].label} — Carian Meluas`; }
+      function listFileBase() { return `Carian_${list.cat}_${todayStr()}`; }
+      function listAoa() {
+        return [['BIL', ...list.headers], ...sortedRows().map((r, k) => [k + 1, ...list.headers.map((_, i) => r[i] ?? '')])];
+      }
+
+      function printList() {
+        if (!list) return;
+        const w = window.open('', '_blank');
+        if (!w) { showToast('Tetingkap cetak disekat. Benarkan pop-up untuk laman ini.', true); return; }
+        const aoa = listAoa();
+        const html = `<!DOCTYPE html><html lang="ms"><head><meta charset="UTF-8"><title>${escapeHtml(listFileBase())}</title>
+          <style>
+            @page { size: A4 landscape; margin: 10mm; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 0; padding: 12px; }
+            h1 { font-size: 15pt; margin: 0 0 4px; }
+            .sub { font-size: 9pt; color: #475569; margin-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+            th, td { border: 1px solid #94a3b8; padding: 3px 5px; text-align: left; vertical-align: top; }
+            th { background: #e2e8f0; font-weight: 700; }
+            thead { display: table-header-group; }
+            tr { break-inside: avoid; }
+          </style></head><body>
+          <h1>${escapeHtml(listTitle())}</h1>
+          <div class="sub">Syarat: ${escapeHtml(lastRun ? lastRun.desc : '')} • ${fmtN(aoa.length - 1)}${(list.truncated || aoa.length - 1 !== list.rows.length) ? ' daripada ' + fmtN(list.truncated ? list.count : list.rows.length) : ''} rekod • Dicetak: ${new Date().toLocaleString('ms-MY')}</div>
+          <table><thead><tr>${aoa[0].map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+          <tbody>${aoa.slice(1).map(r => `<tr>${r.map(v => `<td>${escapeHtml(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+          <script>window.onload = function () { setTimeout(function () { window.print(); }, 200); };<\/script>
+          </body></html>`;
+        w.document.open(); w.document.write(html); w.document.close();
+      }
+
+      function exportListXlsx() {
+        if (!list) return;
+        if (typeof XLSX === 'undefined') { showToast('Pustaka Excel belum dimuatkan. Semak sambungan internet.', true); return; }
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(listAoa());
+        ws['!cols'] = [{ wch: 6 }, ...list.headers.map(h => ({ wch: Math.min(40, Math.max(10, h.length + 2)) }))];
+        XLSX.utils.book_append_sheet(wb, ws, list.cat);
+        const info = XLSX.utils.aoa_to_sheet([
+          ['Laporan', listTitle()],
+          ['Syarat', lastRun ? lastRun.desc : ''],
+          ['Jumlah sepadan', list.count],
+          ['Rekod dalam fail', sortedRows().length],
+          ['Tapisan kolum', listFilterCount() ? Object.keys(list.filters).map(i => `${list.headers[i]} (${list.filters[i].size} nilai)`).join('; ') : 'Tiada'],
+          ['Susunan', list.sortIdx >= 0 ? `${list.headers[list.sortIdx]} (${list.asc ? 'A→Z' : 'Z→A'})` : 'Asal'],
+          ['Tarikh', new Date().toLocaleString('ms-MY')]
+        ]);
+        info['!cols'] = [{ wch: 18 }, { wch: 70 }];
+        XLSX.utils.book_append_sheet(wb, info, 'MAKLUMAT');
+        XLSX.writeFile(wb, listFileBase() + '.xlsx');
+        showToast(`Fail ${listFileBase()}.xlsx berjaya dimuat turun.`);
+      }
+
+      function exportListPdf() {
+        if (!list) return;
+        const JsPDF = window.jspdf && window.jspdf.jsPDF;
+        if (!JsPDF) { showToast('Pustaka PDF belum dimuatkan. Semak sambungan internet.', true); return; }
+        const aoa = listAoa();
+        if (aoa.length > 8001 && !confirm(`Senarai ini ada ${fmtN(aoa.length - 1)} rekod. PDF besar boleh ambil masa lama. Teruskan?`)) return;
+        const doc = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const nCols = aoa[0].length;
+        const fs = nCols > 14 ? 5.5 : nCols > 10 ? 6.5 : 7.5;
+        doc.setFontSize(13); doc.text(listTitle(), 10, 12);
+        doc.setFontSize(8); doc.setTextColor(71, 85, 105);
+        const sub = `Syarat: ${lastRun ? lastRun.desc : ''}  |  ${fmtN(aoa.length - 1)}${(list.truncated || aoa.length - 1 !== list.rows.length) ? ' daripada ' + fmtN(list.truncated ? list.count : list.rows.length) : ''} rekod  |  ${new Date().toLocaleString('ms-MY')}`;
+        doc.text(doc.splitTextToSize(sub, 277), 10, 17);
+        doc.autoTable({
+          head: [aoa[0]],
+          body: aoa.slice(1).map(r => r.map(v => String(v ?? ''))),
+          startY: 22,
+          margin: { left: 10, right: 10, top: 10, bottom: 12 },
+          styles: { fontSize: fs, cellPadding: 1.2, overflow: 'linebreak', lineColor: [203, 213, 225], lineWidth: 0.1 },
+          headStyles: { fillColor: [29, 78, 216], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          didDrawPage: d => {
+            doc.setFontSize(7); doc.setTextColor(148, 163, 184);
+            doc.text(`Muka ${doc.internal.getNumberOfPages()}`, 287, 205, { align: 'right' });
+          }
+        });
+        doc.save(listFileBase() + '.pdf');
+        showToast(`Fail ${listFileBase()}.pdf berjaya dimuat turun.`);
+      }
+      document.querySelectorAll('[data-adv-cat]').forEach(cb => cb.addEventListener('change', () => {
+        adv.cats = [...document.querySelectorAll('[data-adv-cat]:checked')].map(x => x.dataset.advCat);
+        closeAdvMenu(); save(); renderAdv();
+      }));
+      document.getElementById('advAddCond').addEventListener('click', () => {
+        adv.conds.push({ col: '', mode: 'in', value: '', values: [] }); save(); renderAdv();
+      });
+      document.getElementById('advGroup').addEventListener('change', e => { adv.groupBy = e.target.value; save(); });
+      document.getElementById('advRun').addEventListener('click', async () => {
+        if (!adv.cats.length) { showToast('Sila tick sekurang-kurangnya satu data.', true); return; }
+        closeAdvMenu();
+        const conds = validConds(-1);
+        const out = document.getElementById('advResult');
+        const btn = document.getElementById('advRun');
+        btn.disabled = true; out.innerHTML = '<div style="color:#64748b;">⏳ Mengira dalam semua data... (kali pertama boleh ambil masa beberapa saat)</div>';
+        try {
+          const res = await callGAS({ action: 'queryStats', categories: adv.cats, conditions: conds, groupBy: adv.groupBy });
+          const fmt = n => Number(n).toLocaleString('ms-MY');
+          const desc = escapeHtml(describeAll(conds));
+          out.innerHTML = `<div style="font-size:.85rem;color:#64748b;margin-bottom:8px;">Syarat: ${desc}</div><div class="adv-res-grid">` +
+            adv.cats.map(cat => {
+              const r = res.results[cat] || {};
+              if (r.count == null) return `<div class="adv-res-card"><b>${CAT_META[cat].label}</b><div style="color:#dc2626;margin-top:6px;">Kolum tiada dalam data ini: ${escapeHtml((r.missing || []).join(', '))}</div></div>`;
+              const groups = Object.entries(r.groups || {}).sort((a, b) => b[1] - a[1]);
+              return `<div class="adv-res-card" style="border-top:4px solid ${CAT_META[cat].color}">
+                <b>${CAT_META[cat].label}</b>
+                <div class="adv-res-num" style="color:${CAT_META[cat].color}">${fmt(r.count)}</div>
+                <div style="font-size:.8rem;color:#64748b;">daripada ${fmt(r.total)} rekod</div>
+                ${groups.length ? `<table>${groups.map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${fmt(v)}</td></tr>`).join('')}</table>` : ''}
+                ${(r.missing || []).length ? `<div style="color:#d97706;font-size:.8rem;margin-top:6px;">Kolum pecahan tiada: ${escapeHtml(r.missing.join(', '))}</div>` : ''}
+                ${r.count > 0 ? `<button type="button" class="btn-3d btn-white btn-sm adv-list-btn" data-adv-list="${cat}">📋 Papar Senarai (${fmt(r.count)})</button>` : ''}
+              </div>`;
+            }).join('') + '</div><div id="advList"></div>';
+          lastRun = { conds: conds.map(c => ({ ...c, values: c.values ? c.values.slice() : undefined })), desc: describeAll(conds) };
+          out.querySelectorAll('[data-adv-list]').forEach(b => b.addEventListener('click', () => loadList(b.dataset.advList)));
+          // Mula ambil senarai di belakang tabir supaya "Papar Senarai" keluar serta-merta
+          prefetchRows(adv.cats.filter(cat => res.results[cat] && res.results[cat].count > 0 && res.results[cat].count <= 60000));
+        } catch (err) {
+          out.innerHTML = `<div style="color:#dc2626;">Gagal: ${escapeHtml(err.message || String(err))}</div>`;
+        } finally { btn.disabled = false; }
+      });
+      renderAdv();
+    })();
+
+    /* ========================================================================
+     * MODAL PEMILIH KOLUM DINAMIK
+     * ======================================================================== */
+    function openColumnModal(cat) {
+      state.activeModalCat = cat;
+      const headers = state.currentSchool?.data[cat]?.headers || state.metadata.headers[cat] || [];
+      const selected = new Set(state.selectedCols[cat] || []);
+
+      document.getElementById('colModalTitle').textContent = `Pilih Kolum Paparan — ${CAT_META[cat].label}`;
+      document.getElementById('colFilterInput').value = '';
+
+      const grid = document.getElementById('colCheckboxGrid');
+      grid.innerHTML = headers.map(h => `
+        <label class="col-chip" data-col-label="${escapeHtml(h.toUpperCase())}">
+          <input type="checkbox" value="${escapeHtml(h)}" ${selected.has(h) ? 'checked' : ''} />
+          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(h)}">${escapeHtml(h)}</span>
+        </label>
+      `).join('');
+
+      document.getElementById('colModal').classList.add('open');
+    }
+
+    document.getElementById('colFilterInput').addEventListener('input', (e) => {
+      const q = e.target.value.trim().toUpperCase();
+      document.querySelectorAll('#colCheckboxGrid .col-chip').forEach(chip => {
+        chip.style.display = chip.dataset.colLabel.includes(q) ? 'flex' : 'none';
+      });
+    });
+
+    document.getElementById('btnColAll').addEventListener('click', () => {
+      document.querySelectorAll('#colCheckboxGrid input[type="checkbox"]').forEach(cb => cb.checked = true);
+    });
+
+    document.getElementById('btnColClear').addEventListener('click', () => {
+      document.querySelectorAll('#colCheckboxGrid input[type="checkbox"]').forEach(cb => cb.checked = false);
+    });
+
+    document.getElementById('btnColDefault').addEventListener('click', () => {
+      const cat = state.activeModalCat;
+      const headers = state.currentSchool?.data[cat]?.headers || state.metadata.headers[cat] || [];
+      const defaults = new Set(getSmartDefaultCols(cat, headers));
+      document.querySelectorAll('#colCheckboxGrid input[type="checkbox"]').forEach(cb => {
+        cb.checked = defaults.has(cb.value);
+      });
+    });
+
+    document.getElementById('btnCloseColModal').addEventListener('click', () => {
+      document.getElementById('colModal').classList.remove('open');
+    });
+
+    document.getElementById('btnSaveCols').addEventListener('click', () => {
+      const cat = state.activeModalCat;
+      const checked = Array.from(document.querySelectorAll('#colCheckboxGrid input[type="checkbox"]:checked'))
+        .map(cb => cb.value);
+
+      if (!checked.length) {
+        showToast('Sila pilih sekurang-kurangnya satu kolum.', true);
+        return;
+      }
+
+      state.selectedCols[cat] = checked;
+      localStorage.setItem('ds_cols_' + cat, JSON.stringify(checked));
+      const tsC = state.tableState[cat];
+      if (tsC.sortKey && !checked.includes(tsC.sortKey)) tsC.sortKey = null;
+      Object.keys(tsC.filters || {}).forEach(k => { if (!checked.includes(k)) delete tsC.filters[k]; });
+      document.getElementById('colModal').classList.remove('open');
+      renderTables();
+      showToast(`Pilihan ${checked.length} kolum untuk ${CAT_META[cat].label} disimpan.`);
+    });
+
+    /* ========================================================================
+     * EKSPORT LAPORAN SEKOLAH KE EXCEL & CETAK
+     * ======================================================================== */
+    document.getElementById('btnExportSchool').addEventListener('click', () => {
+      if (!state.currentSchool) return;
+      const wb = XLSX.utils.book_new();
+
+      ['MURID', 'GURU', 'AKP'].forEach(cat => {
+        const ds = state.currentSchool.data[cat] || { headers: [], rows: [] };
+        const chosen = (state.selectedCols[cat] || []).filter(c => ds.headers.includes(c));
+        const activeCols = chosen.length ? chosen : ds.headers;
+        const idxs = activeCols.map(c => ds.headers.indexOf(c));
+
+        const aoa = [activeCols];
+        ds.rows.forEach(r => aoa.push(idxs.map(i => r[i] ?? '')));
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        XLSX.utils.book_append_sheet(wb, ws, cat);
+      });
+
+      const fname = `Laporan_${state.currentSchool.kodSekolah}_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, fname);
+      showToast(`Fail ${fname} berjaya dimuat turun.`);
+    });
+
+    document.getElementById('btnPrintSchool').addEventListener('click', () => window.print());
+
+    /* ========================================================================
+     * MUAT NAIK FAIL EXCEL SECARA BERPERINGKAT (BATCH UPLOAD)
+     * ======================================================================== */
+    ['MURID', 'GURU', 'AKP'].forEach(cat => {
+      const inputEl = document.getElementById('file' + cat);
+      const dropzone = inputEl.closest('.dropzone');
+      const btnUpload = document.getElementById('btnUpload' + cat);
+
+      dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleExcelFile(cat, e.dataTransfer.files[0]);
+      });
+
+      inputEl.addEventListener('change', (e) => {
+        if (e.target.files.length) handleExcelFile(cat, e.target.files[0]);
+      });
+
+      btnUpload.addEventListener('click', () => runBatchUpload(cat));
+    });
+
+    function handleExcelFile(cat, file) {
+      const infoEl = document.getElementById('info' + cat);
+      const btnUpload = document.getElementById('btnUpload' + cat);
+      infoEl.innerHTML = `<span class="spinner"></span> Membaca fail <strong>${escapeHtml(file.name)}</strong>...`;
+      btnUpload.disabled = true;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array', raw: false });
+          const firstSheet = wb.SheetNames[0];
+          const aoa = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, defval: '' });
+
+          if (aoa.length < 2) {
+            throw new Error('Fail kosong atau tidak mengandungi baris data.');
+          }
+
+          const headers = aoa[0].map(h => String(h || '').trim());
+          const rows = aoa.slice(1).filter(r => r.some(cell => String(cell).trim() !== ''));
+
+          const hasKod = headers.some(h => h.toUpperCase().replace(/[^A-Z0-9]/g, '').includes('KODSEKOLAH'));
+          state.parsedFiles[cat] = { fileName: file.name, headers, rows };
+
+          infoEl.innerHTML = `
+            <strong>${escapeHtml(file.name)}</strong><br/>
+            ${rows.length.toLocaleString()} baris • ${headers.length} kolum
+            ${hasKod ? ' • <span style="color:#059669;font-weight:700;">✓ KODSEKOLAH dikesan</span>' : ' • <span style="color:#d97706;font-weight:700;">⚠ Sila pastikan kolum KODSEKOLAH wujud</span>'}
+          `;
+          document.getElementById('prog' + cat).style.width = '0%';
+          document.getElementById('progText' + cat).textContent = 'Sedia untuk muat naik';
+          btnUpload.disabled = false;
+        } catch (err) {
+          infoEl.innerHTML = `<span style="color:var(--danger);">Ralat fail: ${escapeHtml(err.message)}</span>`;
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    async function runBatchUpload(cat) {
+      const parsed = state.parsedFiles[cat];
+      if (!parsed) return;
+
+      const mode = document.querySelector('input[name="uploadMode"]:checked').value;
+      const btn = document.getElementById('btnUpload' + cat);
+      const progBar = document.getElementById('prog' + cat);
+      const progTxt = document.getElementById('progText' + cat);
+
+      btn.disabled = true;
+      const totalRows = parsed.rows.length;
+      const totalBatches = Math.ceil(totalRows / BATCH_UPLOAD_SIZE);
+
+      try {
+        for (let b = 0; b < totalBatches; b++) {
+          const chunk = parsed.rows.slice(b * BATCH_UPLOAD_SIZE, (b + 1) * BATCH_UPLOAD_SIZE);
+          progTxt.textContent = `Menghantar batch ${b + 1} / ${totalBatches} (${Math.min((b + 1) * BATCH_UPLOAD_SIZE, totalRows).toLocaleString()} baris)...`;
+
+          const up = await callGAS({
+            action: 'uploadBatch',
+            category: cat,
+            mode: mode,
+            batchIndex: b,
+            headers: parsed.headers,
+            rows: chunk
+          });
+          if (typeof up.rowsWritten !== 'number') {
+            throw new Error('Pelayan tidak mengesahkan penyimpanan batch ' + (b + 1) + '.');
+          }
+
+          const pct = Math.round(((b + 1) / totalBatches) * 100);
+          progBar.style.width = pct + '%';
+        }
+
+        progTxt.textContent = `Selesai! ${totalRows.toLocaleString()} rekod berjaya disimpan ke Google Sheet.`;
+        progTxt.style.color = '';
+        showToast(`Muat naik Data ${cat} selesai (${totalRows.toLocaleString()} baris).`);
+        await loadMetadata();
+      } catch (err) {
+        progTxt.textContent = 'Ralat: ' + err.message;
+        showToast('Gagal muat naik: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /* ========================================================================
+     * TETAPAN & SERVICE WORKER PWA
+     * ======================================================================== */
+    document.getElementById('btnTestConn').addEventListener('click', async () => {
+      showToast('Menyegar data...');
+      conn.retryDelay = 5000;
+      const ok = await loadMetadata();
+      if (ok) showToast('Sambungan aktif. Data terkini dimuatkan.');
+    });
+
+    document.getElementById('btnResetCols').addEventListener('click', () => {
+      ['MURID', 'GURU', 'AKP'].forEach(cat => {
+        localStorage.removeItem('ds_cols_' + cat);
+        state.selectedCols[cat] = getSmartDefaultCols(cat, state.metadata.headers[cat] || []);
+      });
+      if (state.currentSchool) renderTables();
+      showToast('Pilihan kolum telah ditetapkan semula kepada tetapan lalai.');
+    });
+
+    // Daftar Service Worker untuk PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+
+    // Semak sesi log masuk semasa halaman dimuatkan
+    window.addEventListener('DOMContentLoaded', () => {
+      if (localStorage.getItem('ds_auth') === '1' || sessionStorage.getItem('ds_auth') === '1') {
+        localStorage.setItem('ds_auth', '1');
+        document.getElementById('lockScreen').style.display = 'none';
+        document.getElementById('appShell').style.display = 'block';
+        initAfterUnlock();
+      } else {
+        document.getElementById('pinInput').focus();
+      }
+    });
+  </script>
+</body>
+</html>
