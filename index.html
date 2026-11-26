@@ -2,7 +2,7 @@
 <html lang="ms">
 <head>
   <meta charset="UTF-8" />
-  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbw9pSG2Xp6WTG03qiOcPW49Xt9ZfUqM2RWOywEgvA-MiJaDcn82ZDRTU08TUROish-7-g/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
+  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbxETiJq_X5aHOvBTvkb7S52QRoF5Ot6od1AxdDopBCcY3PKcmBRGe6AAq-xEKe_8m8t_w/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -1051,12 +1051,11 @@
         <details id="advDetails">
           <summary class="field-label adv-summary">🔎 Carian Meluas — kira jumlah dalam semua data (seluruh Malaysia)</summary>
           <div class="adv-body">
-            <div class="adv-row">
-              <span class="field-label" style="margin:0;">Cari dalam:</span>
-              <label class="adv-chk"><input type="checkbox" data-adv-cat="MURID"> Murid</label>
-              <label class="adv-chk"><input type="checkbox" data-adv-cat="GURU"> Guru</label>
-              <label class="adv-chk"><input type="checkbox" data-adv-cat="AKP"> AKP</label>
+            <div class="adv-row" id="advCatsRow">
+              <span class="field-label" style="margin:0;">Cari dalam fail yang dimuat naik:</span>
+              <div id="advCats" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;"></div>
             </div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Hanya fail yang ada dalam Senarai Fail (tab Muat Naik Excel) ditunjukkan di sini. Muat naik fail baharu untuk menambah pilihan, atau padam fail untuk membuangnya dari carian.</div>
             <div id="advConds"></div>
             <div class="adv-row">
               <button type="button" id="advAddCond" class="btn-3d btn-white btn-sm">＋ Tambah Syarat</button>
@@ -1143,18 +1142,23 @@
         <h3 style="font-size:1.08rem; font-weight:800; margin-bottom:6px;">Muat Naik Fail Excel (.xlsx / .xls / .csv) ke Google Sheet</h3>
         <p style="font-size:0.87rem; color:var(--text-sub);">
           Hanya ada <strong>satu butang muat naik</strong>. Apa-apa fail Excel pun boleh — Murid, Guru, AKP, Kehadiran, Kokurikulum dan lain-lain.
-          Taip <strong>Nama Fail</strong>, pilih fail, kemudian tekan <strong>Muat Naik Fail Ini</strong>. Data dihantar secara berperingkat
+          Taip <strong>Nama Fail</strong>, pilih cara simpan (Sheet Baharu / Ganti / Sambung ke Bawah), pilih fail, kemudian tekan <strong>Muat Naik Fail Ini</strong>. Data dihantar secara berperingkat
           (<em>batch upload</em> 500 baris setiap pusingan) supaya stabil walaupun fail bersaiz besar.
           Jika fail ada kolum <strong>KODSEKOLAH</strong>, fail itu boleh dicari ikut sekolah di Dashboard. Jika tiada, fail tetap disimpan dan disenaraikan di bawah.
         </p>
-        <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
-          <label style="display:flex; align-items:center; gap:7px; font-size:0.86rem; font-weight:700; cursor:pointer;">
-            <input type="radio" name="uploadMode" value="replace" checked style="accent-color:var(--primary);" />
-            Ganti Data Sedia Ada (Replace)
+        <div style="margin-top:14px; display:flex; flex-direction:column; gap:10px; align-items:flex-start;">
+          <span class="field-label" style="margin:0;">3. Pilih cara simpan fail ini:</span>
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.88rem; font-weight:700; cursor:pointer; background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:10px 12px; width:100%;">
+            <input type="radio" name="uploadMode" value="new" checked style="accent-color:var(--primary); margin-top:2px;" />
+            <span>🆕 Sheet Baharu — simpan sebagai fail/tab baharu, data lama tidak disentuh<br/><span style="font-weight:500; font-size:0.8rem; color:var(--text-sub);">Kalau nama sama sudah wujud, sistem buat versi baharu automatik: Kehadiran (2), Kehadiran (3)...</span></span>
           </label>
-          <label style="display:flex; align-items:center; gap:7px; font-size:0.86rem; font-weight:700; cursor:pointer;">
-            <input type="radio" name="uploadMode" value="append" style="accent-color:var(--primary);" />
-            Tambah di Bawah Data Sedia Ada (Append — header mesti sama)
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.88rem; font-weight:700; cursor:pointer; background:#fffbeb; border:1.5px solid #fcd34d; border-radius:12px; padding:10px 12px; width:100%;">
+            <input type="radio" name="uploadMode" value="replace" style="accent-color:var(--primary); margin-top:2px;" />
+            <span>🔄 Ganti Data Lama (Tindan) — padam data lama dalam fail yang sama, ganti dengan fail baharu<br/><span style="font-weight:500; font-size:0.8rem; color:var(--text-sub);">Sesuai bila fail baharu adalah versi terkini yang betul.</span></span>
+          </label>
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.88rem; font-weight:700; cursor:pointer; background:#eff6ff; border:1.5px solid #93c5fd; border-radius:12px; padding:10px 12px; width:100%;">
+            <input type="radio" name="uploadMode" value="append" style="accent-color:var(--primary); margin-top:2px;" />
+            <span>➕ Sambung ke Bawah — tambah baris baharu di bawah data sedia ada<br/><span style="font-weight:500; font-size:0.8rem; color:var(--text-sub);">Header fail baharu mesti sama dengan fail lama.</span></span>
           </label>
         </div>
       </div>
@@ -1308,6 +1312,7 @@
       parsedFiles: { MURID: null, GURU: null, AKP: null },
       parsedFile: null, // v13: fail generik semasa (satu butang upload)
       files: [],       // v13: senarai fail dari Google Sheet (_SENARAI_FAIL)
+      filesLoaded: false, // v15: true bila senarai fail sudah diambil dari Sheet
       activeModalCat: null
     };
 
@@ -1558,6 +1563,7 @@
 
         // v13: senarai fail generik dari Google Sheet (kekal selagi tidak dipadam)
         state.files = Array.isArray(res.files) ? res.files : (state.files || []);
+        if (Array.isArray(res.files)) state.filesLoaded = true;
         renderFileList();
         if (!Array.isArray(res.files)) loadFiles();
 
@@ -2289,13 +2295,63 @@
       let adv = { cats: ['MURID'], conds: [{ col: '', mode: 'in', value: '', values: [] }], groupBy: '', open: false };
       try { adv = Object.assign(adv, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
       const save = () => { try { localStorage.setItem(LS, JSON.stringify(adv)); } catch (e) {} };
+      // v15 — Carian Meluas ikut fail yang dimuat naik sahaja.
+      // Kunci dalaman kini NAMA TAB (DATA_MURID, DATA_KEHADIRAN, ...).
+      const ADV_COLORS = ['#059669', '#4f46e5', '#d97706', '#2563eb', '#0891b2', '#db2777', '#65a30d', '#9333ea', '#ea580c', '#0d9488'];
+      const normalizeAdvCat = c => c === 'MURID' ? 'DATA_MURID' : c === 'GURU' ? 'DATA_GURU' : c === 'AKP' ? 'DATA_AKP' : String(c || '');
+      adv.cats = (adv.cats || []).map(normalizeAdvCat);
+      function advSheets() { return (state.files || []).map(f => f.sheet); }
+      function advFileFor(sheet) { return (state.files || []).find(f => f.sheet === sheet) || null; }
+      function advFileLabel(sheet) { const f = advFileFor(sheet); return f ? f.name : (sheet || ''); }
+      function advFileColor(sheet) {
+        if (sheet === 'DATA_MURID') return '#059669';
+        if (sheet === 'DATA_GURU') return '#4f46e5';
+        if (sheet === 'DATA_AKP') return '#d97706';
+        const idx = Math.max(0, advSheets().indexOf(sheet));
+        return ADV_COLORS[idx % ADV_COLORS.length];
+      }
+      function headersForAdv(sheet) {
+        const f = advFileFor(sheet);
+        if (f && Array.isArray(f.headers) && f.headers.length) return f.headers;
+        const legacy = sheet === 'DATA_MURID' ? 'MURID' : sheet === 'DATA_GURU' ? 'GURU' : sheet === 'DATA_AKP' ? 'AKP' : null;
+        return (legacy && state.metadata.headers[legacy]) || state.metadata.headers[sheet] || [];
+      }
+      function pruneAdvCats() {
+        const avail = new Set(advSheets());
+        const before = adv.cats.length;
+        adv.cats = adv.cats.filter(c => avail.has(c));
+        if (adv.cats.length !== before) save();
+      }
+      function renderAdvCats() {
+        const wrap = document.getElementById('advCats');
+        if (!wrap) return;
+        if (!state.filesLoaded) {
+          wrap.innerHTML = `<span style="font-size:0.86rem; color:var(--text-muted);">Memuat senarai fail...</span>`;
+          return;
+        }
+        pruneAdvCats();
+        const files = state.files || [];
+        if (!files.length) {
+          wrap.innerHTML = `<span style="font-size:0.86rem; color:var(--text-muted);">Belum ada fail dimuat naik — muat naik fail Excel dahulu di tab <strong>Muat Naik Excel</strong>.</span>`;
+          return;
+        }
+        wrap.innerHTML = files.map(f => `
+          <label class="adv-chk" title="${escapeHtml(f.sheet)} • ${Number(f.count || 0).toLocaleString()} rekod">
+            <input type="checkbox" data-adv-cat="${escapeHtml(f.sheet)}" ${adv.cats.includes(f.sheet) ? 'checked' : ''}>
+            ${escapeHtml(f.name)} <span style="color:var(--text-muted); font-weight:500;">(${Number(f.count || 0).toLocaleString()})</span>
+          </label>`).join('');
+        wrap.querySelectorAll('[data-adv-cat]').forEach(cb => cb.addEventListener('change', () => {
+          adv.cats = [...document.querySelectorAll('[data-adv-cat]:checked')].map(x => x.dataset.advCat);
+          closeAdvMenu(); save(); renderAdv();
+        }));
+      }
       const det = document.getElementById('advDetails');
       det.open = !!adv.open;
       det.addEventListener('toggle', () => { adv.open = det.open; save(); if (det.open) renderAdv(); });
 
       function allCols() {
         const set = new Set();
-        adv.cats.forEach(c => (state.metadata.headers[c] || []).forEach(h => h && set.add(h)));
+        adv.cats.forEach(c => headersForAdv(c).forEach(h => h && set.add(h)));
         return [...set];
       }
       function opts(cols, sel, blank) {
@@ -2412,7 +2468,7 @@
           placeAdvMenu(i); return;
         }
         if (!adv.cats.length) {
-          body.innerHTML = `<div class="fm-note warn">Sila tick sekurang-kurangnya satu data (Murid / Guru / AKP).</div>`;
+          body.innerHTML = `<div class="fm-note warn">Sila tick sekurang-kurangnya satu fail di atas.</div>`;
           placeAdvMenu(i); return;
         }
 
@@ -2468,7 +2524,7 @@
           const total = Number(res.distinct || 0).toLocaleString('ms-MY');
           if (res.truncated) parts.push(`⚠️ Terlalu banyak nilai (${total}). Dipaparkan ${values.length.toLocaleString('ms-MY')} yang paling kerap — <b>taip dalam kotak cari</b> untuk cari nilai lain.`);
           else parts.push(`${total} nilai unik${others.length ? ' (mengikut syarat lain)' : ''}. Nombor di kanan = bilangan rekod.`);
-          if ((res.missingIn || []).length) parts.push(`Kolum ini tiada dalam data: ${res.missingIn.map(x => CAT_META[x] ? CAT_META[x].label.replace('Senarai ', '') : x).join(', ')}.`);
+          if ((res.missingIn || []).length) parts.push(`Kolum ini tiada dalam data: ${res.missingIn.map(x => advFileLabel(x)).join(', ')}.`);
           noteEl.className = 'fm-note' + (res.truncated || (res.missingIn || []).length ? ' warn' : '');
           noteEl.innerHTML = parts.join('<br>');
         }
@@ -2531,7 +2587,7 @@
       }
 
       function renderAdv() {
-        document.querySelectorAll('[data-adv-cat]').forEach(cb => { cb.checked = adv.cats.includes(cb.dataset.advCat); });
+        renderAdvCats();
         const cols = allCols();
         document.getElementById('advConds').innerHTML = adv.conds.map((c, i) => `
           <div class="adv-cond">
@@ -2573,16 +2629,15 @@
       const todayStr = () => new Date().toISOString().slice(0, 10);
 
       function defaultListCols(cat) {
-        const heads = state.metadata.headers[cat] || [];
+        const heads = headersForAdv(cat);
         const pick = [];
         const add = c => { if (c && heads.includes(c) && !pick.includes(c)) pick.push(c); };
         heads.filter(h => /^KOD_?SEKOLAH$/i.test(h) || /^NAMA_?SEKOLAH$/i.test(h) || /^NEGERI$/i.test(h) || /^PPD$/i.test(h)).forEach(add);
-        ((state.selectedCols[cat] && state.selectedCols[cat].length) ? state.selectedCols[cat] : DEFAULT_COLS[cat]).forEach(add);
         (lastRun ? lastRun.conds : []).forEach(c => add(c.col));
         return pick.length ? pick : heads.slice(0, 10);
       }
       function listColsFor(cat) {
-        const heads = state.metadata.headers[cat] || [];
+        const heads = headersForAdv(cat);
         const saved = (adv.listCols[cat] || []).filter(c => heads.includes(c));
         return saved.length ? saved : defaultListCols(cat);
       }
@@ -2620,7 +2675,7 @@
         const ready = !force && entry && entry.done && Date.now() - entry.t < ROWS_TTL;
         let timer = null;
         if (!ready) {
-          const label = CAT_META[cat].label.replace('Senarai ', '');
+          const label = advFileLabel(cat);
           const t0 = Date.now();
           box.innerHTML = `<div class="adv-list"><div style="color:#64748b;display:flex;align-items:center;gap:10px;"><span class="spinner" style="width:18px;height:18px;border-width:3px;"></span><span>Mengambil senarai ${label}... <b data-adv-elapsed>0</b> saat</span></div></div>`;
           box.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2766,14 +2821,14 @@
       function renderList() {
         const box = document.getElementById('advList');
         if (!box || !list) return;
-        const meta = CAT_META[list.cat];
+        const meta = { label: advFileLabel(list.cat), color: advFileColor(list.cat) };
         const rows = sortedRows();
         const all = list.pageSize === 0;
         const pages = all ? 1 : Math.max(1, Math.ceil(rows.length / list.pageSize));
         list.page = Math.min(Math.max(1, list.page), pages);
         const start = all ? 0 : (list.page - 1) * list.pageSize;
         const pageRows = all ? rows : rows.slice(start, start + list.pageSize);
-        const heads = state.metadata.headers[list.cat] || list.headers;
+        const heads = headersForAdv(list.cat).length ? headersForAdv(list.cat) : list.headers;
         const chosen = new Set(list.headers);
         box.innerHTML = `
           <div class="adv-list" style="border-top:4px solid ${meta.color}">
@@ -2878,7 +2933,7 @@
         });
       }
 
-      function listTitle() { return `${CAT_META[list.cat].label} — Carian Meluas`; }
+      function listTitle() { return `${advFileLabel(list.cat)} — Carian Meluas`; }
       function listFileBase() { return `Carian_${list.cat}_${todayStr()}`; }
       function listAoa() {
         return [['BIL', ...list.headers], ...sortedRows().map((r, k) => [k + 1, ...list.headers.map((_, i) => r[i] ?? '')])];
@@ -2917,7 +2972,7 @@
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(listAoa());
         ws['!cols'] = [{ wch: 6 }, ...list.headers.map(h => ({ wch: Math.min(40, Math.max(10, h.length + 2)) }))];
-        XLSX.utils.book_append_sheet(wb, ws, list.cat);
+        XLSX.utils.book_append_sheet(wb, ws, String(list.cat).substring(0, 31));
         const info = XLSX.utils.aoa_to_sheet([
           ['Laporan', listTitle()],
           ['Syarat', lastRun ? lastRun.desc : ''],
@@ -2962,16 +3017,13 @@
         doc.save(listFileBase() + '.pdf');
         showToast(`Fail ${listFileBase()}.pdf berjaya dimuat turun.`);
       }
-      document.querySelectorAll('[data-adv-cat]').forEach(cb => cb.addEventListener('change', () => {
-        adv.cats = [...document.querySelectorAll('[data-adv-cat]:checked')].map(x => x.dataset.advCat);
-        closeAdvMenu(); save(); renderAdv();
-      }));
+      /* v15: pengikatan checkbox dibuat dalam renderAdvCats() — checkbox dijana semula setiap kali senarai fail berubah. */
       document.getElementById('advAddCond').addEventListener('click', () => {
         adv.conds.push({ col: '', mode: 'in', value: '', values: [] }); save(); renderAdv();
       });
       document.getElementById('advGroup').addEventListener('change', e => { adv.groupBy = e.target.value; save(); });
       document.getElementById('advRun').addEventListener('click', async () => {
-        if (!adv.cats.length) { showToast('Sila tick sekurang-kurangnya satu data.', true); return; }
+        if (!adv.cats.length) { showToast('Sila tick sekurang-kurangnya satu fail di atas.', true); return; }
         closeAdvMenu();
         const conds = validConds(-1);
         const out = document.getElementById('advResult');
@@ -2984,11 +3036,11 @@
           out.innerHTML = `<div style="font-size:.85rem;color:#64748b;margin-bottom:8px;">Syarat: ${desc}</div><div class="adv-res-grid">` +
             adv.cats.map(cat => {
               const r = res.results[cat] || {};
-              if (r.count == null) return `<div class="adv-res-card"><b>${CAT_META[cat].label}</b><div style="color:#dc2626;margin-top:6px;">Kolum tiada dalam data ini: ${escapeHtml((r.missing || []).join(', '))}</div></div>`;
+              if (r.count == null) return `<div class="adv-res-card"><b>${advFileLabel(cat)}</b><div style="color:#dc2626;margin-top:6px;">Kolum tiada dalam data ini: ${escapeHtml((r.missing || []).join(', '))}</div></div>`;
               const groups = Object.entries(r.groups || {}).sort((a, b) => b[1] - a[1]);
-              return `<div class="adv-res-card" style="border-top:4px solid ${CAT_META[cat].color}">
-                <b>${CAT_META[cat].label}</b>
-                <div class="adv-res-num" style="color:${CAT_META[cat].color}">${fmt(r.count)}</div>
+              return `<div class="adv-res-card" style="border-top:4px solid ${advFileColor(cat)}">
+                <b>${advFileLabel(cat)}</b>
+                <div class="adv-res-num" style="color:${advFileColor(cat)}">${fmt(r.count)}</div>
                 <div style="font-size:.8rem;color:#64748b;">daripada ${fmt(r.total)} rekod</div>
                 ${groups.length ? `<table>${groups.map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${fmt(v)}</td></tr>`).join('')}</table>` : ''}
                 ${(r.missing || []).length ? `<div style="color:#d97706;font-size:.8rem;margin-top:6px;">Kolum pecahan tiada: ${escapeHtml(r.missing.join(', '))}</div>` : ''}
@@ -3119,13 +3171,40 @@
       return 'DATA_' + clean;
     }
 
+    function getUploadMode() {
+      const r = document.querySelector('input[name="uploadMode"]:checked');
+      return r ? r.value : 'new';
+    }
+
+    function resolveNewSheet(name) {
+      // v14: Sheet Baharu — cari nama tab bebas (DATA_KEHADIRAN_2, _3...)
+      const base = sheetNamePreviewFor(name);
+      const sheets = new Set((state.files || []).map(f => f.sheet));
+      if (!sheets.has(base)) return { sheet: base, display: String(name || '').trim(), n: 1 };
+      let n = 2;
+      while (sheets.has(base + '_' + n)) n++;
+      return { sheet: base + '_' + n, display: String(name || '').trim() + ' (' + n + ')', n: n };
+    }
+
     function updateSheetPreview() {
       const name = document.getElementById('fileDisplayName').value;
-      document.getElementById('sheetNamePreview').innerHTML =
-        'Akan disimpan sebagai tab Google Sheet: <strong>' + escapeHtml(sheetNamePreviewFor(name)) + '</strong>';
+      const mode = getUploadMode();
+      const el = document.getElementById('sheetNamePreview');
+      if (!String(name || '').trim()) { el.innerHTML = 'Akan disimpan sebagai tab Google Sheet: <strong>—</strong>'; return; }
+      if (mode === 'new') {
+        const r = resolveNewSheet(name);
+        el.innerHTML = r.n > 1
+          ? '🆕 Akan disimpan sebagai tab baharu: <strong>' + escapeHtml(r.sheet) + '</strong> — fail baharu: <strong>' + escapeHtml(r.display) + '</strong>. Data lama kekal.'
+          : '🆕 Akan disimpan sebagai tab baharu: <strong>' + escapeHtml(r.sheet) + '</strong>.';
+      } else if (mode === 'replace') {
+        el.innerHTML = '🔄 Akan MENGGANTIKAN tab: <strong>' + escapeHtml(sheetNamePreviewFor(name)) + '</strong> — data lama dalam tab ini akan dipadam.';
+      } else {
+        el.innerHTML = '➕ Akan DITAMBAH di bawah tab: <strong>' + escapeHtml(sheetNamePreviewFor(name)) + '</strong> — baris baharu disambung di bawah data lama.';
+      }
     }
 
     document.getElementById('fileDisplayName').addEventListener('input', updateSheetPreview);
+    document.querySelectorAll('input[name="uploadMode"]').forEach(r => r.addEventListener('change', updateSheetPreview));
     document.querySelectorAll('[data-quick-name]').forEach(btn => {
       btn.addEventListener('click', () => {
         document.getElementById('fileDisplayName').value = btn.dataset.quickName;
@@ -3250,17 +3329,29 @@
         document.getElementById('fileDisplayName').focus();
         return;
       }
-      const mode = document.querySelector('input[name="uploadMode"]:checked').value;
-      const sheetName = sheetNamePreviewFor(fileName);
-      const existing = (state.files || []).find(f => f.sheet === sheetName);
-      if (existing) {
-        if (mode === 'replace') {
-          if (!confirm(`Fail "${existing.name}" sudah wujud (${Number(existing.count || 0).toLocaleString()} rekod).\n\nMod Ganti akan MEMADAM data lama dan ganti dengan fail baharu ini. Teruskan?`)) return;
-        } else {
+      const mode = getUploadMode();
+      const baseSheet = sheetNamePreviewFor(fileName);
+      const existing = (state.files || []).find(f => f.sheet === baseSheet);
+      let targetSheetName = baseSheet;
+      let finalDisplayName = fileName;
+
+      if (mode === 'new') {
+        if (existing) {
+          const r = resolveNewSheet(fileName);
+          targetSheetName = r.sheet;
+          finalDisplayName = r.display;
+          if (!confirm(`Fail "${existing.name}" sudah wujud (${Number(existing.count || 0).toLocaleString()} rekod).\n\nSheet Baharu: fail ini akan disimpan sebagai "${finalDisplayName}" (tab ${targetSheetName}).\nData lama TIDAK disentuh. Teruskan?`)) return;
+        }
+      } else if (mode === 'replace') {
+        if (existing) {
+          if (!confirm(`Fail "${existing.name}" sudah wujud (${Number(existing.count || 0).toLocaleString()} rekod).\n\nGanti Data Lama akan MEMADAM data lama dan ganti dengan fail baharu ini. Teruskan?`)) return;
+        }
+      } else { // append — Sambung ke Bawah
+        if (existing) {
           const sameHeaders = existing.headers.length === parsed.headers.length &&
             existing.headers.every((h, i) => String(h).toUpperCase() === String(parsed.headers[i] || '').trim().toUpperCase());
           if (!sameHeaders) {
-            showToast('Header fail ini tidak sama dengan fail sedia ada. Guna mod Ganti, atau pastikan header sama sebelum Tambah.', true);
+            showToast('Header fail ini tidak sama dengan fail sedia ada. Guna Sheet Baharu atau Ganti, atau pastikan header sama sebelum Sambung ke Bawah.', true);
             return;
           }
           if (!confirm(`Fail "${existing.name}" sudah wujud. ${parsed.rows.length.toLocaleString()} baris baharu akan DITAMBAH di bawah ${Number(existing.count || 0).toLocaleString()} rekod sedia ada. Teruskan?`)) return;
@@ -3273,11 +3364,13 @@
       btn.disabled = true;
       const totalRows = parsed.rows.length;
       const totalBatches = Math.ceil(totalRows / BATCH_UPLOAD_SIZE);
+      let savedSheet = targetSheetName;
+      let savedName = finalDisplayName;
       try {
         for (let b = 0; b < totalBatches; b++) {
           const chunk = parsed.rows.slice(b * BATCH_UPLOAD_SIZE, (b + 1) * BATCH_UPLOAD_SIZE);
           progTxt.textContent = `Menghantar batch ${b + 1} / ${totalBatches} (${Math.min((b + 1) * BATCH_UPLOAD_SIZE, totalRows).toLocaleString()} baris)...`;
-          const up = await callGAS({
+          const payload = {
             action: 'uploadFileBatch',
             fileName: fileName,
             mode: mode,
@@ -3285,14 +3378,18 @@
             headers: parsed.headers,
             rows: chunk,
             totalRows: totalRows
-          });
+          };
+          if (mode === 'new') payload.targetSheetName = targetSheetName;
+          const up = await callGAS(payload);
           if (typeof up.rowsWritten !== 'number') {
             throw new Error('Pelayan tidak mengesahkan penyimpanan batch ' + (b + 1) + '.');
           }
+          if (up.sheetName) { savedSheet = up.sheetName; targetSheetName = up.sheetName; }
+          if (up.fileName) savedName = up.fileName;
           progBar.style.width = Math.round(((b + 1) / totalBatches) * 100) + '%';
         }
-        progTxt.textContent = `Selesai! ${totalRows.toLocaleString()} rekod "${fileName}" berjaya disimpan ke Google Sheet (tab ${sheetName}).`;
-        showToast(`Muat naik "${fileName}" selesai (${totalRows.toLocaleString()} baris).`);
+        progTxt.textContent = `Selesai! ${totalRows.toLocaleString()} rekod "${savedName}" berjaya disimpan ke Google Sheet (tab ${savedSheet}).`;
+        showToast(`Muat naik "${savedName}" selesai (${totalRows.toLocaleString()} baris).`);
         clearGenericUpload();
         document.getElementById('fileDisplayName').value = '';
         updateSheetPreview();
@@ -3311,6 +3408,7 @@
       try {
         const res = await callGAS({ action: 'listFiles' });
         state.files = Array.isArray(res.files) ? res.files : [];
+        if (Array.isArray(res.files)) state.filesLoaded = true;
         renderFileList();
         return true;
       } catch (err) {
@@ -3326,6 +3424,7 @@
     }
 
     function renderFileList() {
+      updateSheetPreview();
       const wrap = document.getElementById('fileList');
       if (!wrap) return;
       const files = state.files || [];

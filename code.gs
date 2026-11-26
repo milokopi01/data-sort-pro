@@ -54,7 +54,7 @@ function doGet(e) {
     status: 'ok',
     app: 'dashboard-data-sekolah',
     message: 'API Dashboard Data Sekolah aktif.',
-    version: '4.0'
+    version: '4.2'
   });
 }
 
@@ -767,6 +767,15 @@ function handleUploadBatch_(req) {
  * ============================================================================
  */
 
+function findFreeSheetName_(ss, baseSheetName) {
+  // v14: Sheet Baharu — jika DATA_KEHADIRAN sudah ada, cari DATA_KEHADIRAN_2,
+  // kemudian _3, _4 ... supaya data lama langsung tidak disentuh.
+  if (!ss.getSheetByName(baseSheetName)) return { sheet: baseSheetName, n: 1 };
+  let n = 2;
+  while (ss.getSheetByName(baseSheetName + '_' + n)) { n++; if (n > 99) break; }
+  return { sheet: baseSheetName + '_' + n, n: n };
+}
+
 function sheetNameForFile_(fileName) {
   const raw = String(fileName || '').trim().toUpperCase();
   const norm = raw.replace(/[^A-Z0-9]/g, '');
@@ -931,14 +940,42 @@ function handleUploadFileBatch_(req) {
     if (fileName.length < 2) {
       return { status: 'error', message: 'Sila isi Nama Fail (contoh: Murid, Guru, AKP, Kehadiran).' };
     }
-    const sheetName = sheetNameForFile_(fileName);
-    const mode = req.mode === 'append' ? 'append' : 'replace';
+    // v14 — tiga pilihan: 'new' (Sheet Baharu), 'replace' (Ganti/Tindan), 'append' (Sambung ke Bawah)
+    const mode = req.mode === 'append' ? 'append' : (req.mode === 'new' ? 'new' : 'replace');
     const batchIndex = Number(req.batchIndex || 0);
     const headers = Array.isArray(req.headers) ? req.headers : [];
     const rows = Array.isArray(req.rows) ? req.rows : [];
     if (!headers.length) return { status: 'error', message: 'Fail tiada header (baris pertama kosong).' };
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const baseSheetName = sheetNameForFile_(fileName);
+    let sheetName = baseSheetName;
+    let displayName = fileName;
+
+    if (mode === 'new') {
+      if (req.targetSheetName) {
+        // Batch 2+ bagi fail Sheet Baharu: kekal pada tab yang sama (jangan cari _3 pula).
+        // Nota: banding dengan base (bukan nombor di hujung nama sahaja) supaya
+        // "Kehadiran 2025" -> DATA_KEHADIRAN_2025 tidak disalah baca sebagai versi (2025).
+        sheetName = String(req.targetSheetName).trim();
+        if (sheetName !== baseSheetName && sheetName.indexOf(baseSheetName + '_') === 0) {
+          const suffix = sheetName.substring(baseSheetName.length + 1);
+          if (/^[2-9]\d?$/.test(suffix)) displayName = fileName + ' (' + suffix + ')';
+        }
+      } else if (batchIndex === 0) {
+        const free = findFreeSheetName_(ss, baseSheetName);
+        sheetName = free.sheet;
+        if (free.n > 1) displayName = fileName + ' (' + free.n + ')';
+      } else {
+        // Batch susulan tanpa targetSheetName (pelayar lama): guna entri
+        // registry terkini untuk nama ini — elak cipta tab baharu setiap batch.
+        const files = listFiles_();
+        const hit = files.filter(function (f) { return f.name === fileName || f.name.indexOf(fileName + ' (') === 0; })
+          .sort(function (a, b) { return String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || '')); })[0];
+        if (hit) { sheetName = hit.sheet; displayName = hit.name; }
+      }
+    }
+
     let sheet = ss.getSheetByName(sheetName);
     if (!sheet) { sheet = ss.insertSheet(sheetName); sheet.setFrozenRows(1); }
 
@@ -949,7 +986,7 @@ function handleUploadFileBatch_(req) {
       const same = existing.length === headers.length &&
         existing.every(function (h, i) { return h.toUpperCase() === String(headers[i] || '').trim().toUpperCase(); });
       if (existing.length && !same) {
-        return { status: 'error', message: 'Header fail ini tidak sama dengan fail "' + fileName + '" yang sedia ada. Guna mod Ganti, atau pastikan header sama sebelum Tambah.' };
+        return { status: 'error', message: 'Header fail ini tidak sama dengan fail "' + fileName + '" yang sedia ada. Guna mod Ganti, atau pastikan header sama sebelum Sambung ke Bawah.' };
       }
     }
 
@@ -983,7 +1020,7 @@ function handleUploadFileBatch_(req) {
 
     const totalNow = Math.max(0, sheet.getLastRow() - 1);
     try {
-      registerFile_(fileName, sheetName,
+      registerFile_(displayName, sheetName,
         batchIndex === 0 ? headers : null,
         (batchIndex === 0 && rows.length) ? rows[0] : null,
         totalNow);
@@ -991,7 +1028,7 @@ function handleUploadFileBatch_(req) {
 
     return {
       status: 'success',
-      fileName: fileName,
+      fileName: displayName,
       sheetName: sheetName,
       category: sheetName,
       batchIndex: batchIndex,
@@ -1083,14 +1120,49 @@ function readColsDisp_(cat, sheet, idxList, lastRow, lastCol) {
   return out;
 }
 
+/**
+ * ============================================================================
+ * v15 — CARIAN MELUAS UNTUK MANA-MANA FAIL
+ * Kunci carian kini ialah NAMA TAB (DATA_MURID, DATA_KEHADIRAN, ...), bukan
+ * lagi hanya MURID/GURU/AKP. Kunci lama (MURID/GURU/AKP) dan nama fail
+ * ("Kehadiran") turut diterima dan dipetakan ke tab yang betul.
+ * ============================================================================
+ */
+function normalizeQueryKey_(key) {
+  const raw = String(key || '').trim();
+  if (!raw) return '';
+  const up = raw.toUpperCase();
+  if (up === 'MURID') return CONFIG.SHEETS.MURID;
+  if (up === 'GURU') return CONFIG.SHEETS.GURU;
+  if (up === 'AKP') return CONFIG.SHEETS.AKP;
+  if (up.indexOf('DATA_') === 0) return up;
+  // Nama fail paparan, cth. "Kehadiran (2)" -> cari dalam registry
+  try {
+    const files = listFiles_();
+    for (let i = 0; i < files.length; i++) {
+      if (String(files[i].name || '').toUpperCase() === up) return files[i].sheet;
+    }
+  } catch (e) {}
+  return sheetNameForFile_(raw);
+}
+
+function resolveQuerySheet_(key) {
+  const sheetName = normalizeQueryKey_(key);
+  if (!sheetName) return null;
+  try {
+    return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  } catch (e) { return null; }
+}
+
 function handleQueryStats_(req) {
-  const cats = (req.categories || []).filter(function (c) { return ['MURID', 'GURU', 'AKP'].indexOf(c) !== -1; });
-  if (!cats.length) return { status: 'error', message: 'Sila pilih sekurang-kurangnya satu data.' };
+  const cats = (req.categories || []).map(function (c) { return normalizeQueryKey_(c); })
+    .filter(function (c, i, a) { return c && a.indexOf(c) === i && resolveQuerySheet_(c); });
+  if (!cats.length) return { status: 'error', message: 'Sila pilih sekurang-kurangnya satu fail yang telah dimuat naik.' };
   const conds = cleanConds_(req.conditions);
   const groupBy = String(req.groupBy || '').trim();
 
   const cache = CacheService.getScriptCache();
-  const shape = cats.map(function (c) { const sh = getTargetSheet_(c); return sh.getLastRow() + 'x' + sh.getLastColumn(); }).join(',');
+  const shape = cats.map(function (c) { const sh = resolveQuerySheet_(c); return sh.getLastRow() + 'x' + sh.getLastColumn(); }).join(',');
   const ck = 'Q3|' + getDataVersion_() + '|' + shape + '|' + Utilities.base64EncodeWebSafe(
     Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify([cats, conds, groupBy])));
   const hit = cache.get(ck);
@@ -1099,7 +1171,7 @@ function handleQueryStats_(req) {
   const norm = function (v) { return String(v == null ? '' : v).trim().toUpperCase(); };
   const results = {};
   cats.forEach(function (cat) {
-    const sheet = getTargetSheet_(cat);
+    const sheet = resolveQuerySheet_(cat);
     const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
     const res = { total: Math.max(0, lastRow - 1), count: 0, groups: {}, missing: [] };
     results[cat] = res;
@@ -1217,8 +1289,9 @@ function colOfQ_(headers, name) {
  * ============================================================================
  */
 function handleDistinctValues_(req) {
-  const cats = (req.categories || []).filter(function (c) { return ['MURID', 'GURU', 'AKP'].indexOf(c) !== -1; });
-  if (!cats.length) return { status: 'error', message: 'Sila pilih sekurang-kurangnya satu data.' };
+  const cats = (req.categories || []).map(function (c) { return normalizeQueryKey_(c); })
+    .filter(function (c, i, a) { return c && a.indexOf(c) === i && resolveQuerySheet_(c); });
+  if (!cats.length) return { status: 'error', message: 'Sila pilih sekurang-kurangnya satu fail yang telah dimuat naik.' };
   const col = String(req.col || '').trim();
   if (!col) return { status: 'error', message: 'Sila pilih kolum dahulu.' };
   const conds = cleanConds_(req.conditions);
@@ -1226,7 +1299,7 @@ function handleDistinctValues_(req) {
   const limit = Math.max(50, Math.min(Number(req.limit) || 3000, 5000));
 
   const cache = CacheService.getScriptCache();
-  const shape = cats.map(function (c) { const sh = getTargetSheet_(c); return sh.getLastRow() + 'x' + sh.getLastColumn(); }).join(',');
+  const shape = cats.map(function (c) { const sh = resolveQuerySheet_(c); return sh.getLastRow() + 'x' + sh.getLastColumn(); }).join(',');
   const ck = 'D2|' + getDataVersion_() + '|' + shape + '|' + Utilities.base64EncodeWebSafe(
     Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify([cats, col, conds, search, limit])));
   const hit = cache.get(ck);
@@ -1236,7 +1309,7 @@ function handleDistinctValues_(req) {
   const missingIn = [];
   let matchedRows = 0;
   cats.forEach(function (cat) {
-    const sheet = getTargetSheet_(cat);
+    const sheet = resolveQuerySheet_(cat);
     const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
     if (lastRow < 2 || lastCol < 1) return;
     const headers = sheetHeadersQ_(sheet, lastCol);
@@ -1281,12 +1354,12 @@ function handleDistinctValues_(req) {
  * ============================================================================
  */
 function handleQueryRows_(req) {
-  const cat = String(req.category || '');
-  if (['MURID', 'GURU', 'AKP'].indexOf(cat) === -1) return { status: 'error', message: 'Kategori tidak sah.' };
+  const cat = normalizeQueryKey_(req.category || '');
+  if (!cat || !resolveQuerySheet_(cat)) return { status: 'error', message: 'Fail tidak sah atau belum dimuat naik.' };
   const conds = cleanConds_(req.conditions);
   const limit = Math.max(1, Math.min(Number(req.limit) || 5000, 60000));
 
-  const sheet = getTargetSheet_(cat);
+  const sheet = resolveQuerySheet_(cat);
   const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
   if (lastRow < 2 || lastCol < 1) {
     return { status: 'success', category: cat, headers: [], rows: [], count: 0, total: 0, truncated: false };
