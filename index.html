@@ -2,7 +2,7 @@
 <html lang="ms">
 <head>
   <meta charset="UTF-8" />
-  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbw94i8ZoOg28766FCo7P6kDriPKZxE1HYji-CYAwNlkK2AnIOkM6f4-LzUUcXm18fYncw/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
+  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbxETiJq_X5aHOvBTvkb7S52QRoF5Ot6od1AxdDopBCcY3PKcmBRGe6AAq-xEKe_8m8t_w/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -412,6 +412,7 @@
     .adv-list-tools .select-3d { width: auto; padding: 6px 10px; font-size: 0.8rem; }
     .adv-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 8px 12px; font-size: 0.82rem; margin-bottom: 10px; }
     .adv-cols { position: relative; }
+    .adv-cond-incomplete { border: 1.5px dashed #f59e0b !important; border-radius: 12px; padding: 6px; background: #fffbeb; }
     .adv-cols > summary { list-style: none; cursor: pointer; }
     .adv-cols > summary::-webkit-details-marker { display: none; }
     .adv-cols-panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; width: 320px; max-width: 86vw; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 18px 40px rgba(15,23,42,.18); padding: 10px; }
@@ -1077,6 +1078,8 @@
             </div>
             <div style="font-size:0.8rem; color:var(--text-muted);">Hanya fail yang ada dalam Senarai Fail (tab Muat Naik Excel) ditunjukkan di sini. Muat naik fail baharu untuk menambah pilihan, atau padam fail untuk membuangnya dari carian.</div>
             <div id="advConds"></div>
+            <div id="advCondWarn"></div>
+            <div style="font-size:.8rem; color:var(--text-muted); margin-top:6px;">💡 Kolum yang dipilih sebagai syarat akan turut dipaparkan dalam senarai — isi nilai untuk menapis, atau biarkan kosong jika hanya mahu kolum itu dipaparkan.</div>
             <div class="adv-row">
               <button type="button" id="advAddCond" class="btn-3d btn-white btn-sm">＋ Tambah Syarat</button>
               <label class="field-label" style="margin:0;" for="advGroup">Pecahan ikut:</label>
@@ -2328,7 +2331,7 @@
       adv.cats = (adv.cats || []).map(normalizeAdvCat);
       // v18: lalai kolum senarai berubah (lihat defaultListCols) — buang
       // pilihan kolum lama yang tersimpan supaya senarai tidak kekal 2 kolum.
-      if (adv.listColsVer !== 'v18') { adv.listCols = {}; adv.listColsVer = 'v18'; save(); }
+      if (adv.listColsVer !== 'v20') { adv.listCols = {}; adv.listColsVer = 'v20'; save(); }
       function advSheets() { return (state.files || []).map(f => f.sheet); }
       function advFileFor(sheet) { return (state.files || []).find(f => f.sheet === sheet) || null; }
       function advFileLabel(sheet) { const f = advFileFor(sheet); return f ? f.name : (sheet || ''); }
@@ -2687,8 +2690,19 @@
         });
         if (adv.groupBy && !cols.includes(adv.groupBy)) { adv.groupBy = ''; pruned = true; }
         if (pruned) save();
+        // v20: syarat yang kolumnya dipilih tetapi nilainya kosong sebelum ini
+        // digugurkan SENYAP — pengguna sangka ia aktif, sedangkan senarai
+        // tidak menapis apa-apa dan kolum itu tidak dipaparkan. Sekarang
+        // baris itu diserlahkan dan diberi amaran yang jelas.
+        const incompleteCols = adv.conds.filter(c => c.col && !isValidCond(c)).map(c => c.col);
+        const warnEl = document.getElementById('advCondWarn');
+        if (warnEl) {
+          warnEl.innerHTML = incompleteCols.length
+            ? `<div style="font-size:.82rem; font-weight:700; color:#92400e; background:#fef3c7; border:1px solid #fcd34d; border-radius:10px; padding:8px 10px; margin-top:8px;">ℹ️ Syarat tanpa nilai tidak menapis apa-apa: <strong>${incompleteCols.map(x => escapeHtml(x)).join(', ')}</strong>. Isi nilai untuk menapis, atau padam baris itu jika tidak perlu. Kolum syarat tetap akan dipaparkan dalam senarai (apabila kolum paparan mengikut lalai).</div>`
+            : '';
+        }
         document.getElementById('advConds').innerHTML = adv.conds.map((c, i) => `
-          <div class="adv-cond">
+          <div class="adv-cond ${c.col && !isValidCond(c) ? 'adv-cond-incomplete' : ''}">
             <select class="select-3d adv-sel" data-ci="${i}" data-f="col">${opts(cols, c.col, '— Pilih kolum —')}</select>
             <button type="button" class="select-3d adv-pick adv-mode-btn ${c.mode === 'in' && (c.values || []).length ? 'is-active' : ''}" data-cmenu="${i}" title="Klik untuk pilih & tick nilai (seperti tapisan Excel)">
               <span class="t">${escapeHtml(modeLabel(c))}</span><span class="k">▾</span>
@@ -2720,6 +2734,8 @@
       /* ---------- SENARAI REKOD: jadual biasa + susun + cetak + Excel + PDF ---------- */
       let lastRun = null;
       let list = null; // { cat, headers, rows, count, total, truncated, sortIdx, asc, page, pageSize }
+      let pendingCols = null; // v19: draf tick pemilih Kolum yang belum diguna
+      let pendingColsCat = null; // fail yang draf itu untuknya
       adv.listCols = adv.listCols || {};
       adv.listLimit = adv.listLimit || 5000;
       const collator = new Intl.Collator('ms', { numeric: true, sensitivity: 'base' });
@@ -2731,17 +2747,29 @@
         const pick = [];
         const add = c => { if (c && heads.includes(c) && !pick.includes(c)) pick.push(c); };
         heads.filter(h => /^KOD_?SEKOLAH$/i.test(h) || /^NAMA_?SEKOLAH$/i.test(h) || /^NEGERI$/i.test(h) || /^PPD$/i.test(h)).forEach(add);
-        (lastRun ? lastRun.conds : []).forEach(c => add(c.col));
-        // v18: tambah kolum pengenalan (nama orang, NOKP, jawatan...) supaya
-        // baris dalam senarai boleh dibezakan — sebelum ini carian ikut
-        // sekolah hanya papar NAMA_SEKOLAH + KODSEKOLAH, 25 baris nampak sama.
-        heads.filter(h => /^(NAMA|NOKP|NO_?KP|KAD_?PENGENALAN|JAWATAN|GRED|KATEGORI|STATUS|JANTINA|BANGSA)/i.test(h)).forEach(add);
-        if (pick.length < 4) heads.slice(0, 10).forEach(add);
-        return pick.length ? pick.slice(0, 10) : heads.slice(0, 10);
+        // v20: guna SEMUA baris syarat (adv.conds), bukan hanya syarat yang
+        // sah (lastRun.conds). Contoh Naim: NAMA dan GAJI_HAKIKI dipilih
+        // sebagai syarat tetapi nilainya kosong — sebelum ini kedua-duanya
+        // digugurkan, jadi gaji tidak pernah muncul dalam senarai. Sekarang
+        // kolum itu tetap dipaparkan; syaratnya sahaja tidak menapis.
+        adv.conds.forEach(c => add(c.col));
+        if (adv.groupBy) add(adv.groupBy);
+        // v19: lalai yang lebih ketat — hanya nama, no. identiti dan jawatan.
+        // Lalai 10 kolum v18 termasuk NAMA_PASANGAN, GRED_PENYANDANG dan
+        // lain-lain yang pengguna tidak minta. Nota: fail data guru TIADA
+        // kolum NOKP — kolum identitinya ialah KPUTAMA.
+        heads.filter(h => /^(NAMA|KPUTAMA|NOKP|NO_?KP|JAWATAN)$/i.test(h)).forEach(add);
+        if (pick.length < 4) heads.slice(0, 7).forEach(add);
+        return pick.length ? pick.slice(0, 7) : heads.slice(0, 7);
       }
+      const lastHeadersByCat = {}; // kolum sebenar yang pelayan pulangkan, ikut fail
       function listColsFor(cat) {
         const heads = headersForAdv(cat);
-        const saved = (adv.listCols[cat] || []).filter(c => heads.includes(c));
+        // v19: jangan gugurkan kolum yang sah semata-mata kerana daftar
+        // header dalam app sudah lapuk — terima juga kolum yang pelayan
+        // terakhir pulangkan untuk fail ini.
+        const known = new Set([...heads, ...(lastHeadersByCat[cat] || [])]);
+        const saved = (adv.listCols[cat] || []).filter(c => known.has(c));
         return saved.length ? saved : defaultListCols(cat);
       }
 
@@ -2770,6 +2798,7 @@
 
       let loadToken = 0;
       async function loadList(cat, force) {
+        if (pendingColsCat && pendingColsCat !== cat) { pendingCols = null; pendingColsCat = null; }
         // v18: Papar Senarai sentiasa guna syarat TERKINI — kalau pengguna
         // sudah tukar syarat/fail selepas Kira Jumlah, senarai yang keluar
         // mesti ikut pilihan baharu itu, bukan kiraan lama.
@@ -2795,6 +2824,20 @@
         try {
           const res = await fetchRows(cat, force);
           if (token !== loadToken) return; // pengguna sudah tekan butang lain
+          // v19: semak kembali senarai kolum yang terkini — kalau pelayan
+          // pulangkan kolum yang berbeza daripada yang diminta (cth. kolum
+          // itu tiada dalam fail), betulkan simpanan supaya pemilih, jadual
+          // dan eksport semuanya ikut senarai yang sama.
+          const wantCols = listColsFor(cat);
+          const gotCols = res.headers || [];
+          if (wantCols.length && gotCols.length && JSON.stringify(wantCols) !== JSON.stringify(gotCols)) {
+            const dropped = wantCols.filter(c => !gotCols.includes(c));
+            lastHeadersByCat[cat] = gotCols.slice();
+            adv.listCols[cat] = gotCols.slice(); save();
+            if (dropped.length) showToast('Kolum tiada dalam fail ini, digugurkan: ' + dropped.join(', '), true);
+          } else if (gotCols.length) {
+            lastHeadersByCat[cat] = gotCols.slice();
+          }
           // v18: kekalkan susun & tapis merentas perubahan kolum — dipetakan
           // ikut NAMA kolum, bukan indeks (indeks berubah bila kolum berubah).
           const oldSortHeader = list && list.sortIdx >= 0 ? list.headers[list.sortIdx] : null;
@@ -2946,7 +2989,14 @@
         const start = all ? 0 : (list.page - 1) * list.pageSize;
         const pageRows = all ? rows : rows.slice(start, start + list.pageSize);
         const heads = headersForAdv(list.cat).length ? headersForAdv(list.cat) : list.headers;
-        const chosen = new Set(list.headers);
+        // v19: pemilih tunjuk DRAF tick terkini, bukan hanya kolum yang sedang
+        // dipaparkan — susun/tapis/halaman tidak lagi memadam draf itu.
+        const draftCols = (pendingCols && pendingColsCat === list.cat) ? pendingCols : null;
+        const chosen = new Set(draftCols || list.headers);
+        const draftDiffers = draftCols && JSON.stringify(draftCols) !== JSON.stringify(list.headers);
+        const draftNote = draftDiffers
+          ? `<div data-advcol-note style="font-size:.78rem;font-weight:700;color:#b45309;margin:6px 0 0;">Pilihan baharu: ${draftCols.length} kolum — tutup panel ini atau tekan Guna untuk paparkan.</div>`
+          : `<div data-advcol-note style="font-size:.78rem;color:var(--text-muted);margin:6px 0 0;">Dipaparkan sekarang: ${list.headers.length} kolum.</div>`;
         box.innerHTML = `
           <div class="adv-list" style="border-top:4px solid ${meta.color}">
             <div class="adv-list-head">
@@ -2957,12 +3007,13 @@
               <div class="adv-list-tools">
                 ${(listFilterCount() || list.sortIdx >= 0) ? `<button type="button" class="btn-3d btn-white btn-sm" data-adv-clear>✕ Kosongkan Susun/Tapis${listFilterCount() ? ` (${listFilterCount()})` : ''}</button>` : ''}
                 <details class="adv-cols">
-                  <summary class="btn-3d btn-white btn-sm">⚙️ Kolum (${list.headers.length})</summary>
+                  <summary class="btn-3d btn-white btn-sm">⚙️ Kolum (${list.headers.length})${draftDiffers ? ' • ' + draftCols.length + ' dipilih' : ''}</summary>
                   <div class="adv-cols-panel">
                     <input type="text" class="input-3d" data-advcol-filter placeholder="Cari kolum..." style="padding:7px 10px;font-size:.82rem;">
                     <div class="adv-cols-list">
                       ${heads.map(h => `<label data-advcol-label="${escapeHtml(h.toUpperCase())}"><input type="checkbox" value="${escapeHtml(h)}" ${chosen.has(h) ? 'checked' : ''}> ${escapeHtml(h)}</label>`).join('')}
                     </div>
+                    ${draftNote}
                     <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
                       <button type="button" class="btn-3d btn-white btn-sm" data-advcol-default>Lalai</button>
                       <button type="button" class="btn-3d btn-primary btn-sm" data-advcol-apply>✓ Guna</button>
@@ -3033,7 +3084,7 @@
         q('[data-adv-pagesize]') && q('[data-adv-pagesize]').addEventListener('change', e => { list.pageSize = +e.target.value; list.page = 1; renderList(); });
         q('[data-adv-prev]') && q('[data-adv-prev]').addEventListener('click', () => { list.page--; renderList(); });
         q('[data-adv-next]') && q('[data-adv-next]').addEventListener('click', () => { list.page++; renderList(); });
-        q('[data-adv-close]').addEventListener('click', () => { closeFilterMenu(); list = null; box.innerHTML = ''; });
+        q('[data-adv-close]').addEventListener('click', () => { closeFilterMenu(); list = null; pendingCols = null; pendingColsCat = null; box.innerHTML = ''; });
         q('[data-adv-limit]').addEventListener('change', e => { adv.listLimit = +e.target.value; save(); loadList(list.cat); });
         q('[data-adv-print]').addEventListener('click', printList);
         q('[data-adv-xlsx]').addEventListener('click', exportListXlsx);
@@ -3042,12 +3093,33 @@
           const v = e.target.value.trim().toUpperCase();
           box.querySelectorAll('[data-advcol-label]').forEach(l => { l.style.display = l.dataset.advcolLabel.includes(v) ? '' : 'none'; });
         });
-        q('[data-advcol-default]').addEventListener('click', () => { delete adv.listCols[list.cat]; save(); loadList(list.cat); });
-        q('[data-advcol-apply]').addEventListener('click', () => {
-          const picked = [...box.querySelectorAll('.adv-cols-list input:checked')].map(x => x.value);
+        // v19: tick dalam pemilih dikira serta-merta dan kekal sebagai draf.
+        // Menutup panel = guna pilihan itu — draf tidak lagi hilang begitu
+        // sahaja bila panel ditutup atau senarai disusun/ditapis.
+        const readPicked = () => [...box.querySelectorAll('.adv-cols-list input:checked')].map(x => x.value);
+        const applyPickedCols = () => {
+          const picked = readPicked();
           if (!picked.length) { showToast('Sila pilih sekurang-kurangnya satu kolum.', true); return; }
+          pendingCols = null; pendingColsCat = null;
           adv.listCols[list.cat] = picked; save(); loadList(list.cat);
+        };
+        box.querySelectorAll('.adv-cols-list input').forEach(cb => cb.addEventListener('change', () => {
+          pendingCols = readPicked(); pendingColsCat = list.cat;
+          const sum = q('.adv-cols > summary');
+          if (sum) sum.textContent = `⚙️ Kolum (${list.headers.length}) • ${pendingCols.length} dipilih`;
+          const note = q('[data-advcol-note]');
+          if (note) {
+            const same = JSON.stringify(pendingCols) === JSON.stringify(list.headers);
+            note.textContent = same ? `Dipaparkan sekarang: ${list.headers.length} kolum.` : `Pilihan baharu: ${pendingCols.length} kolum — tutup panel ini atau tekan Guna untuk paparkan.`;
+            note.style.color = same ? '' : '#b45309';
+            note.style.fontWeight = same ? '' : '700';
+          }
+        }));
+        q('.adv-cols').addEventListener('toggle', e => {
+          if (!e.target.open && pendingCols && JSON.stringify(pendingCols) !== JSON.stringify(list.headers)) applyPickedCols();
         });
+        q('[data-advcol-default]').addEventListener('click', () => { pendingCols = null; pendingColsCat = null; delete adv.listCols[list.cat]; save(); loadList(list.cat); });
+        q('[data-advcol-apply]').addEventListener('click', applyPickedCols);
       }
 
       function listTitle() { return `${advFileLabel(list.cat)} — Carian Meluas`; }
