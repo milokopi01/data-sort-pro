@@ -799,6 +799,41 @@
       transition: width 0.25s ease;
     }
 
+    /* ================= v13: SATU BUTANG UPLOAD + SENARAI FAIL ================= */
+    .upload-single { max-width: 880px; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+    .file-name-row { display: flex; flex-direction: column; gap: 7px; }
+    .quick-names { display: flex; flex-wrap: wrap; gap: 7px; }
+    .quick-chip {
+      padding: 7px 13px; border-radius: 999px; border: 1.5px solid #dbe2ec; border-bottom: 3px solid #cbd5e1;
+      background: #ffffff; font-size: 0.82rem; font-weight: 700; color: var(--text-sub); cursor: pointer;
+    }
+    .quick-chip:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+    .sheet-preview { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+    .sheet-preview strong { color: var(--primary-dark); }
+    .preview-box { border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 14px; background: #ffffff; }
+    .preview-box h5 { font-size: 0.86rem; font-weight: 800; margin-bottom: 4px; }
+    .preview-sub { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; }
+    .header-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .header-chip {
+      display: inline-flex; flex-direction: column; gap: 1px; padding: 7px 10px; border-radius: 10px;
+      background: var(--bg-soft); border: 1px solid var(--border-light); border-bottom: 3px solid #cbd5e1;
+      font-size: 0.78rem; max-width: 220px;
+    }
+    .header-chip b { font-weight: 800; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .header-chip span { color: var(--text-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sample-table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--border-light); border-radius: 10px; }
+    table.sample-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 420px; }
+    table.sample-table th { background: #f1f5f9; text-align: left; padding: 8px 10px; border-bottom: 2px solid #cbd5e1; white-space: nowrap; font-weight: 800; }
+    table.sample-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+    .file-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 14px; }
+    .file-card { padding: 18px; display: flex; flex-direction: column; gap: 11px; }
+    .file-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .file-card-head h4 { font-size: 1rem; font-weight: 800; }
+    .file-meta { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; line-height: 1.6; }
+    .file-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .btn-danger-soft { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; border-bottom: 4px solid #fca5a5; }
+    .btn-danger-soft:hover { background: #fee2e2; }
+
     /* ================= MODAL PEMILIH KOLUM DINAMIK ================= */
     .modal-backdrop {
       position: fixed;
@@ -1107,7 +1142,10 @@
       <div class="card-3d" style="padding:20px 22px; margin-bottom:18px;">
         <h3 style="font-size:1.08rem; font-weight:800; margin-bottom:6px;">Muat Naik Fail Excel (.xlsx / .xls / .csv) ke Google Sheet</h3>
         <p style="font-size:0.87rem; color:var(--text-sub);">
-          Data akan dihantar secara berperingkat (<em>batch upload</em> 500 baris setiap pusingan) ke Google Sheet supaya stabil walaupun fail bersaiz besar. Pastikan fail mempunyai kolum <strong>KODSEKOLAH</strong>.
+          Hanya ada <strong>satu butang muat naik</strong>. Apa-apa fail Excel pun boleh — Murid, Guru, AKP, Kehadiran, Kokurikulum dan lain-lain.
+          Taip <strong>Nama Fail</strong>, pilih fail, kemudian tekan <strong>Muat Naik Fail Ini</strong>. Data dihantar secara berperingkat
+          (<em>batch upload</em> 500 baris setiap pusingan) supaya stabil walaupun fail bersaiz besar.
+          Jika fail ada kolum <strong>KODSEKOLAH</strong>, fail itu boleh dicari ikut sekolah di Dashboard. Jika tiada, fail tetap disimpan dan disenaraikan di bawah.
         </p>
         <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
           <label style="display:flex; align-items:center; gap:7px; font-size:0.86rem; font-weight:700; cursor:pointer;">
@@ -1116,65 +1154,59 @@
           </label>
           <label style="display:flex; align-items:center; gap:7px; font-size:0.86rem; font-weight:700; cursor:pointer;">
             <input type="radio" name="uploadMode" value="append" style="accent-color:var(--primary);" />
-            Tambah di Bawah Data Sedia Ada (Append — sesuai untuk gabung ikut PPD/Negeri)
+            Tambah di Bawah Data Sedia Ada (Append — header mesti sama)
           </label>
         </div>
       </div>
 
-      <div class="upload-grid">
-        <!-- KAD UPLOAD MURID -->
-        <div class="card-3d upload-card" data-upload-cat="MURID">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h4 style="font-weight:800; color:var(--murid-dark);">1. Data Murid</h4>
-            <span class="school-badge" style="margin:0; background:var(--murid-soft); color:var(--murid-dark); border-color:#a7f3d0;" id="statCountMURID">0 rekod</span>
+      <div class="card-3d upload-single">
+        <div class="file-name-row">
+          <label class="field-label" for="fileDisplayName" style="margin:0;">1. Nama Fail *</label>
+          <input id="fileDisplayName" type="text" class="input-3d" placeholder="Contoh: Murid, Guru, AKP, Kehadiran, Kokurikulum..." autocomplete="off" maxlength="60" />
+          <div class="quick-names">
+            <span style="font-size:0.8rem; font-weight:700; color:var(--text-muted); align-self:center;">Cadangan:</span>
+            <button type="button" class="quick-chip" data-quick-name="Murid">Murid</button>
+            <button type="button" class="quick-chip" data-quick-name="Guru">Guru</button>
+            <button type="button" class="quick-chip" data-quick-name="AKP">AKP</button>
+            <button type="button" class="quick-chip" data-quick-name="Kehadiran">Kehadiran</button>
+            <button type="button" class="quick-chip" data-quick-name="Kokurikulum">Kokurikulum</button>
           </div>
-          <label class="dropzone" for="fileMURID">
-            <div style="font-size:1.8rem; margin-bottom:6px;">📄</div>
-            <div style="font-weight:700; font-size:0.86rem;">Klik atau tarik fail Excel Murid ke sini</div>
-            <div style="font-size:0.76rem; color:var(--text-muted); margin-top:4px;">.xlsx, .xls atau .csv</div>
-            <input type="file" id="fileMURID" accept=".xlsx,.xls,.csv" hidden />
-          </label>
-          <div id="infoMURID" style="font-size:0.82rem; color:var(--text-sub); min-height:38px;">Belum ada fail dipilih.</div>
-          <div class="progress-track"><div class="progress-fill" id="progMURID"></div></div>
-          <div id="progTextMURID" style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">Sedia</div>
-          <button class="btn-3d btn-emerald" id="btnUploadMURID" disabled>🚀 Muat Naik Data Murid</button>
+          <div class="sheet-preview" id="sheetNamePreview">Akan disimpan sebagai tab Google Sheet: <strong>—</strong></div>
         </div>
 
-        <!-- KAD UPLOAD GURU -->
-        <div class="card-3d upload-card" data-upload-cat="GURU">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h4 style="font-weight:800; color:var(--guru-dark);">2. Data Guru</h4>
-            <span class="school-badge" style="margin:0; background:var(--guru-soft); color:var(--guru-dark); border-color:#c7d2fe;" id="statCountGURU">0 rekod</span>
-          </div>
-          <label class="dropzone" for="fileGURU">
+        <div>
+          <label class="field-label" style="margin-bottom:7px;">2. Pilih Fail Excel</label>
+          <label class="dropzone" for="fileGeneric" style="display:block;">
             <div style="font-size:1.8rem; margin-bottom:6px;">📄</div>
-            <div style="font-weight:700; font-size:0.86rem;">Klik atau tarik fail Excel Guru ke sini</div>
-            <div style="font-size:0.76rem; color:var(--text-muted); margin-top:4px;">.xlsx, .xls atau .csv</div>
-            <input type="file" id="fileGURU" accept=".xlsx,.xls,.csv" hidden />
+            <div style="font-weight:700; font-size:0.86rem;">Klik atau tarik fail Excel ke sini</div>
+            <div style="font-size:0.76rem; color:var(--text-muted); margin-top:4px;">.xlsx, .xls atau .csv — satu fail setiap kali</div>
+            <input type="file" id="fileGeneric" accept=".xlsx,.xls,.csv" hidden />
           </label>
-          <div id="infoGURU" style="font-size:0.82rem; color:var(--text-sub); min-height:38px;">Belum ada fail dipilih.</div>
-          <div class="progress-track"><div class="progress-fill" id="progGURU"></div></div>
-          <div id="progTextGURU" style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">Sedia</div>
-          <button class="btn-3d btn-primary" id="btnUploadGURU" disabled>🚀 Muat Naik Data Guru</button>
         </div>
 
-        <!-- KAD UPLOAD AKP -->
-        <div class="card-3d upload-card" data-upload-cat="AKP">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h4 style="font-weight:800; color:var(--akp-dark);">3. Data AKP</h4>
-            <span class="school-badge" style="margin:0; background:var(--akp-soft); color:var(--akp-dark); border-color:#fde68a;" id="statCountAKP">0 rekod</span>
-          </div>
-          <label class="dropzone" for="fileAKP">
-            <div style="font-size:1.8rem; margin-bottom:6px;">📄</div>
-            <div style="font-weight:700; font-size:0.86rem;">Klik atau tarik fail Excel AKP ke sini</div>
-            <div style="font-size:0.76rem; color:var(--text-muted); margin-top:4px;">.xlsx, .xls atau .csv</div>
-            <input type="file" id="fileAKP" accept=".xlsx,.xls,.csv" hidden />
-          </label>
-          <div id="infoAKP" style="font-size:0.82rem; color:var(--text-sub); min-height:38px;">Belum ada fail dipilih.</div>
-          <div class="progress-track"><div class="progress-fill" id="progAKP"></div></div>
-          <div id="progTextAKP" style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">Sedia</div>
-          <button class="btn-3d btn-white" id="btnUploadAKP" disabled style="border-bottom-color:var(--akp); color:var(--akp-dark);">🚀 Muat Naik Data AKP</button>
+        <div id="infoGeneric" style="font-size:0.82rem; color:var(--text-sub); min-height:20px;">Belum ada fail dipilih.</div>
+        <div id="previewGeneric" style="display:none;"></div>
+
+        <div class="progress-track"><div class="progress-fill" id="progGeneric"></div></div>
+        <div id="progTextGeneric" style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">Sedia</div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+          <button class="btn-3d btn-emerald" id="btnUploadGeneric" disabled style="flex:1; min-width:200px;">🚀 Muat Naik Fail Ini</button>
+          <button class="btn-3d btn-white" id="btnClearGeneric" type="button">✕ Tukar Fail</button>
         </div>
+      </div>
+
+      <div style="margin-top:22px;">
+        <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;">
+          <div>
+            <h3 style="font-size:1.05rem; font-weight:800;">📁 Senarai Fail Yang Telah Dimuat Naik <span id="fileListCount" style="font-size:0.82rem; color:var(--text-muted); font-weight:700;"></span></h3>
+            <p style="font-size:0.83rem; color:var(--text-sub); margin-top:4px;">
+              Selagi anda tidak tekan <strong>Padam</strong>, fail kekal di sini dan di Google Sheet — tutup app atau buka semula pun data tidak hilang.
+              Setiap fail menunjukkan <strong>header kolum</strong> dan <strong>contoh data baris pertama</strong> supaya anda nampak isi setiap kolum.
+            </p>
+          </div>
+          <button class="btn-3d btn-white btn-sm" id="btnRefreshFiles" type="button">🔄 Segar Senarai Fail</button>
+        </div>
+        <div id="fileList" class="file-list"></div>
       </div>
     </section>
 
@@ -1274,6 +1306,8 @@
         AKP:   { search: '', sortKey: loadSort('AKP').k, sortAsc: loadSort('AKP').a, filters: {}, page: 1, pageSize: 25 }
       },
       parsedFiles: { MURID: null, GURU: null, AKP: null },
+      parsedFile: null, // v13: fail generik semasa (satu butang upload)
+      files: [],       // v13: senarai fail dari Google Sheet (_SENARAI_FAIL)
       activeModalCat: null
     };
 
@@ -1313,7 +1347,7 @@
     }
 
     // Tindakan baca sahaja boleh dicuba semula secara automatik (muat naik TIDAK, elak data berganda)
-    const RETRYABLE_ACTIONS = ['getMetadata', 'getSchoolData', 'verifyPin'];
+    const RETRYABLE_ACTIONS = ['getMetadata', 'getSchoolData', 'verifyPin', 'listFiles', 'deleteFile'];
 
     async function callGAS(payload) {
       const tries = RETRYABLE_ACTIONS.includes(payload.action) ? 3 : 1;
@@ -1495,7 +1529,7 @@
         try {
           const res = await callGAS({ action: 'getMetadata' });
           applyMetadata(res);
-          try { localStorage.setItem(META_LS_KEY, JSON.stringify({ url: state.gasUrl, data: { dataVer: res.dataVer || '', headers: res.headers, counts: res.counts, schools: res.schools } })); } catch (e) {}
+          try { localStorage.setItem(META_LS_KEY, JSON.stringify({ url: state.gasUrl, data: { dataVer: res.dataVer || '', headers: res.headers, counts: res.counts, schools: res.schools, files: res.files || [] } })); } catch (e) {}
           conn.lastOk = Date.now();
           conn.retryDelay = 5000;
           setConnStatus(true, `${state.metadata.schools.length} Sekolah`);
@@ -1522,10 +1556,16 @@
         };
         if (window.renderAdvPanel) setTimeout(window.renderAdvPanel, 0);
 
+        // v13: senarai fail generik dari Google Sheet (kekal selagi tidak dipadam)
+        state.files = Array.isArray(res.files) ? res.files : (state.files || []);
+        renderFileList();
+        if (!Array.isArray(res.files)) loadFiles();
+
         // Pastikan pilihan kolum lalai tersedia bagi setiap kategori
         ['MURID', 'GURU', 'AKP'].forEach((cat) => {
           const allH = state.metadata.headers[cat] || [];
-          document.getElementById('statCount' + cat).textContent =
+          const statEl = document.getElementById('statCount' + cat);
+          if (statEl) statEl.textContent =
             (state.metadata.counts[cat] || 0).toLocaleString() + ' rekod';
 
           if (!state.selectedCols[cat] || !state.selectedCols[cat].length) {
@@ -1537,11 +1577,13 @@
           }
         });
 
+        const extraFiles = (state.files || []).filter(f => !['DATA_MURID', 'DATA_GURU', 'DATA_AKP'].includes(f.sheet));
         document.getElementById('dbSummaryText').innerHTML = `
           <div>• <strong>Jumlah Sekolah Unik:</strong> ${state.metadata.schools.length.toLocaleString()} buah sekolah</div>
           <div>• <strong>Rekod Murid:</strong> ${(state.metadata.counts.MURID || 0).toLocaleString()} baris (${(state.metadata.headers.MURID || []).length} kolum)</div>
           <div>• <strong>Rekod Guru:</strong> ${(state.metadata.counts.GURU || 0).toLocaleString()} baris (${(state.metadata.headers.GURU || []).length} kolum)</div>
           <div>• <strong>Rekod AKP:</strong> ${(state.metadata.counts.AKP || 0).toLocaleString()} baris (${(state.metadata.headers.AKP || []).length} kolum)</div>
+          <div>• <strong>Fail Excel lain:</strong> ${extraFiles.length} fail${extraFiles.length ? ' — ' + extraFiles.map(f => escapeHtml(f.name) + ' (' + Number(f.count || 0).toLocaleString() + ')').join(', ') : ''}</div>
         `;
     }
 
@@ -3062,32 +3104,70 @@
     document.getElementById('btnPrintSchool').addEventListener('click', () => window.print());
 
     /* ========================================================================
-     * MUAT NAIK FAIL EXCEL SECARA BERPERINGKAT (BATCH UPLOAD)
+     * v13 — MUAT NAIK FAIL EXCEL GENERIK: SATU BUTANG SAHAJA
+     * Aliran: taip Nama Fail -> pilih fail -> semak header + contoh baris
+     * pertama -> Muat Naik. Fail didaftar dalam _SENARAI_FAIL di Google
+     * Sheet, jadi senarai kekal selagi tidak dipadam.
      * ======================================================================== */
-    ['MURID', 'GURU', 'AKP'].forEach(cat => {
-      const inputEl = document.getElementById('file' + cat);
-      const dropzone = inputEl.closest('.dropzone');
-      const btnUpload = document.getElementById('btnUpload' + cat);
+    function sheetNamePreviewFor(name) {
+      const raw = String(name || '').trim().toUpperCase();
+      if (!raw) return '—';
+      if (raw.indexOf('MURID') !== -1) return 'DATA_MURID';
+      if (raw.indexOf('GURU') !== -1) return 'DATA_GURU';
+      if (raw.indexOf('AKP') !== -1) return 'DATA_AKP';
+      const clean = raw.replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').substring(0, 40) || 'FAIL';
+      return 'DATA_' + clean;
+    }
 
-      dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
-      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-      dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) handleExcelFile(cat, e.dataTransfer.files[0]);
+    function updateSheetPreview() {
+      const name = document.getElementById('fileDisplayName').value;
+      document.getElementById('sheetNamePreview').innerHTML =
+        'Akan disimpan sebagai tab Google Sheet: <strong>' + escapeHtml(sheetNamePreviewFor(name)) + '</strong>';
+    }
+
+    document.getElementById('fileDisplayName').addEventListener('input', updateSheetPreview);
+    document.querySelectorAll('[data-quick-name]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('fileDisplayName').value = btn.dataset.quickName;
+        updateSheetPreview();
+        document.getElementById('fileDisplayName').focus();
       });
-
-      inputEl.addEventListener('change', (e) => {
-        if (e.target.files.length) handleExcelFile(cat, e.target.files[0]);
-      });
-
-      btnUpload.addEventListener('click', () => runBatchUpload(cat));
     });
+    updateSheetPreview();
 
-    function handleExcelFile(cat, file) {
-      const infoEl = document.getElementById('info' + cat);
-      const btnUpload = document.getElementById('btnUpload' + cat);
+    function sampleTableHtml(headers, sample, maxCols) {
+      const cols = headers.slice(0, maxCols || 8);
+      const more = headers.length - cols.length;
+      return `
+        <div class="sample-table-wrap">
+          <table class="sample-table">
+            <thead><tr>${cols.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+            <tbody><tr>${cols.map((h, i) => `<td>${escapeHtml(sample[i] ?? '-')}</td>`).join('')}</tr></tbody>
+          </table>
+        </div>
+        ${more > 0 ? `<div class="preview-sub" style="margin:8px 0 0;">+ ${more} kolum lagi — lihat semua header di bawah jadual.</div>` : ''}`;
+    }
+
+    function headerChipsHtml(headers, sample) {
+      if (!headers.length) return '<div class="preview-sub">Tiada header ditemui.</div>';
+      return `<div class="header-chips">${headers.map((h, i) => `
+        <span class="header-chip" title="${escapeHtml(h)}"><b>${escapeHtml(h)}</b><span>${escapeHtml(sample[i] ?? '—')}</span></span>
+      `).join('')}</div>`;
+    }
+
+    function handleGenericFile(file) {
+      const infoEl = document.getElementById('infoGeneric');
+      const previewEl = document.getElementById('previewGeneric');
+      const btnUpload = document.getElementById('btnUploadGeneric');
+      // Isi Nama Fail automatik daripada nama fail, jika pengguna belum taip
+      const nameInput = document.getElementById('fileDisplayName');
+      if (!nameInput.value.trim()) {
+        const base = file.name.replace(/\.(xlsx|xls|csv)$/i, '').replace(/[_\-]+/g, ' ').trim();
+        nameInput.value = base.charAt(0).toUpperCase() + base.slice(1);
+        updateSheetPreview();
+      }
       infoEl.innerHTML = `<span class="spinner"></span> Membaca fail <strong>${escapeHtml(file.name)}</strong>...`;
+      previewEl.style.display = 'none';
       btnUpload.disabled = true;
 
       const reader = new FileReader();
@@ -3097,76 +3177,222 @@
           const wb = XLSX.read(data, { type: 'array', raw: false });
           const firstSheet = wb.SheetNames[0];
           const aoa = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, defval: '' });
-
-          if (aoa.length < 2) {
-            throw new Error('Fail kosong atau tidak mengandungi baris data.');
-          }
-
+          if (aoa.length < 2) throw new Error('Fail kosong atau tidak mengandungi baris data.');
           const headers = aoa[0].map(h => String(h || '').trim());
+          if (!headers.some(h => h !== '')) throw new Error('Baris pertama (header) kosong.');
           const rows = aoa.slice(1).filter(r => r.some(cell => String(cell).trim() !== ''));
-
+          if (!rows.length) throw new Error('Fail tiada baris data selepas header.');
+          const sample = rows[0] || [];
           const hasKod = headers.some(h => h.toUpperCase().replace(/[^A-Z0-9]/g, '').includes('KODSEKOLAH'));
-          state.parsedFiles[cat] = { fileName: file.name, headers, rows };
+          state.parsedFile = { fileName: file.name, headers, rows, sample };
 
           infoEl.innerHTML = `
             <strong>${escapeHtml(file.name)}</strong><br/>
             ${rows.length.toLocaleString()} baris • ${headers.length} kolum
-            ${hasKod ? ' • <span style="color:#059669;font-weight:700;">✓ KODSEKOLAH dikesan</span>' : ' • <span style="color:#d97706;font-weight:700;">⚠ Sila pastikan kolum KODSEKOLAH wujud</span>'}
+            ${hasKod ? ' • <span style="color:#059669;font-weight:700;">✓ KODSEKOLAH dikesan — boleh dicari ikut sekolah</span>' : ' • <span style="color:#d97706;font-weight:700;">Tiada KODSEKOLAH — fail tetap disimpan, cuma tidak boleh dicari ikut sekolah</span>'}
           `;
-          document.getElementById('prog' + cat).style.width = '0%';
-          document.getElementById('progText' + cat).textContent = 'Sedia untuk muat naik';
+          previewEl.innerHTML = `
+            <div class="preview-box">
+              <h5>👀 Pratonton — Header &amp; Contoh Data (baris pertama)</h5>
+              <div class="preview-sub">Baris atas = nama kolum (header). Baris bawah = contoh data sebenar dari baris pertama fail anda.</div>
+              ${sampleTableHtml(headers, sample, 8)}
+              ${headerChipsHtml(headers, sample)}
+            </div>`;
+          previewEl.style.display = 'block';
+          document.getElementById('progGeneric').style.width = '0%';
+          document.getElementById('progTextGeneric').textContent = 'Sedia untuk muat naik';
           btnUpload.disabled = false;
         } catch (err) {
           infoEl.innerHTML = `<span style="color:var(--danger);">Ralat fail: ${escapeHtml(err.message)}</span>`;
+          state.parsedFile = null;
         }
       };
       reader.readAsArrayBuffer(file);
     }
 
-    async function runBatchUpload(cat) {
-      const parsed = state.parsedFiles[cat];
+    function clearGenericUpload() {
+      state.parsedFile = null;
+      const inputEl = document.getElementById('fileGeneric');
+      if (inputEl) inputEl.value = '';
+      document.getElementById('infoGeneric').textContent = 'Belum ada fail dipilih.';
+      document.getElementById('previewGeneric').style.display = 'none';
+      document.getElementById('previewGeneric').innerHTML = '';
+      document.getElementById('progGeneric').style.width = '0%';
+      document.getElementById('progTextGeneric').textContent = 'Sedia';
+      document.getElementById('btnUploadGeneric').disabled = true;
+    }
+
+    const genericInput = document.getElementById('fileGeneric');
+    const genericDropzone = genericInput.closest('.dropzone');
+    genericDropzone.addEventListener('dragover', (e) => { e.preventDefault(); genericDropzone.classList.add('dragover'); });
+    genericDropzone.addEventListener('dragleave', () => genericDropzone.classList.remove('dragover'));
+    genericDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      genericDropzone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleGenericFile(e.dataTransfer.files[0]);
+    });
+    genericInput.addEventListener('change', (e) => {
+      if (e.target.files.length) handleGenericFile(e.target.files[0]);
+    });
+    document.getElementById('btnClearGeneric').addEventListener('click', clearGenericUpload);
+    document.getElementById('btnUploadGeneric').addEventListener('click', runGenericUpload);
+    document.getElementById('btnRefreshFiles').addEventListener('click', async () => {
+      await loadFiles();
+      showToast('Senarai fail telah disegarkan.');
+    });
+
+    async function runGenericUpload() {
+      const parsed = state.parsedFile;
       if (!parsed) return;
-
+      const fileName = document.getElementById('fileDisplayName').value.trim();
+      if (fileName.length < 2) {
+        showToast('Sila isi Nama Fail dahulu (contoh: Murid, Guru, AKP, Kehadiran).', true);
+        document.getElementById('fileDisplayName').focus();
+        return;
+      }
       const mode = document.querySelector('input[name="uploadMode"]:checked').value;
-      const btn = document.getElementById('btnUpload' + cat);
-      const progBar = document.getElementById('prog' + cat);
-      const progTxt = document.getElementById('progText' + cat);
+      const sheetName = sheetNamePreviewFor(fileName);
+      const existing = (state.files || []).find(f => f.sheet === sheetName);
+      if (existing) {
+        if (mode === 'replace') {
+          if (!confirm(`Fail "${existing.name}" sudah wujud (${Number(existing.count || 0).toLocaleString()} rekod).\n\nMod Ganti akan MEMADAM data lama dan ganti dengan fail baharu ini. Teruskan?`)) return;
+        } else {
+          const sameHeaders = existing.headers.length === parsed.headers.length &&
+            existing.headers.every((h, i) => String(h).toUpperCase() === String(parsed.headers[i] || '').trim().toUpperCase());
+          if (!sameHeaders) {
+            showToast('Header fail ini tidak sama dengan fail sedia ada. Guna mod Ganti, atau pastikan header sama sebelum Tambah.', true);
+            return;
+          }
+          if (!confirm(`Fail "${existing.name}" sudah wujud. ${parsed.rows.length.toLocaleString()} baris baharu akan DITAMBAH di bawah ${Number(existing.count || 0).toLocaleString()} rekod sedia ada. Teruskan?`)) return;
+        }
+      }
 
+      const btn = document.getElementById('btnUploadGeneric');
+      const progBar = document.getElementById('progGeneric');
+      const progTxt = document.getElementById('progTextGeneric');
       btn.disabled = true;
       const totalRows = parsed.rows.length;
       const totalBatches = Math.ceil(totalRows / BATCH_UPLOAD_SIZE);
-
       try {
         for (let b = 0; b < totalBatches; b++) {
           const chunk = parsed.rows.slice(b * BATCH_UPLOAD_SIZE, (b + 1) * BATCH_UPLOAD_SIZE);
           progTxt.textContent = `Menghantar batch ${b + 1} / ${totalBatches} (${Math.min((b + 1) * BATCH_UPLOAD_SIZE, totalRows).toLocaleString()} baris)...`;
-
           const up = await callGAS({
-            action: 'uploadBatch',
-            category: cat,
+            action: 'uploadFileBatch',
+            fileName: fileName,
             mode: mode,
             batchIndex: b,
             headers: parsed.headers,
-            rows: chunk
+            rows: chunk,
+            totalRows: totalRows
           });
           if (typeof up.rowsWritten !== 'number') {
             throw new Error('Pelayan tidak mengesahkan penyimpanan batch ' + (b + 1) + '.');
           }
-
-          const pct = Math.round(((b + 1) / totalBatches) * 100);
-          progBar.style.width = pct + '%';
+          progBar.style.width = Math.round(((b + 1) / totalBatches) * 100) + '%';
         }
-
-        progTxt.textContent = `Selesai! ${totalRows.toLocaleString()} rekod berjaya disimpan ke Google Sheet.`;
-        progTxt.style.color = '';
-        showToast(`Muat naik Data ${cat} selesai (${totalRows.toLocaleString()} baris).`);
+        progTxt.textContent = `Selesai! ${totalRows.toLocaleString()} rekod "${fileName}" berjaya disimpan ke Google Sheet (tab ${sheetName}).`;
+        showToast(`Muat naik "${fileName}" selesai (${totalRows.toLocaleString()} baris).`);
+        clearGenericUpload();
+        document.getElementById('fileDisplayName').value = '';
+        updateSheetPreview();
         await loadMetadata();
+        await loadFiles();
       } catch (err) {
         progTxt.textContent = 'Ralat: ' + err.message;
         showToast('Gagal muat naik: ' + err.message, true);
       } finally {
         btn.disabled = false;
       }
+    }
+
+    /* ---------- Senarai fail kekal (dari Google Sheet) ---------- */
+    async function loadFiles() {
+      try {
+        const res = await callGAS({ action: 'listFiles' });
+        state.files = Array.isArray(res.files) ? res.files : [];
+        renderFileList();
+        return true;
+      } catch (err) {
+        renderFileList();
+        return false;
+      }
+    }
+
+    function fmtUploadDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return isNaN(d) ? String(iso) : d.toLocaleString('ms-MY', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function renderFileList() {
+      const wrap = document.getElementById('fileList');
+      if (!wrap) return;
+      const files = state.files || [];
+      document.getElementById('fileListCount').textContent = files.length ? `(${files.length} fail)` : '';
+      if (!files.length) {
+        wrap.innerHTML = `
+          <div class="card-3d empty-state" style="grid-column:1/-1; padding:28px;">
+            <div style="font-size:2rem; margin-bottom:8px;">📁</div>
+            <h3 style="font-size:1rem; font-weight:800; margin-bottom:4px;">Belum ada fail dimuat naik</h3>
+            <p style="font-size:0.86rem;">Taip Nama Fail di atas, pilih fail Excel dan tekan <strong>Muat Naik Fail Ini</strong>. Fail akan muncul di sini dan kekal selagi tidak dipadam.</p>
+          </div>`;
+        return;
+      }
+      wrap.innerHTML = files.map((f, idx) => {
+        const headers = Array.isArray(f.headers) ? f.headers : [];
+        const sample = Array.isArray(f.sample) ? f.sample : [];
+        return `
+        <div class="card-3d file-card">
+          <div class="file-card-head">
+            <div>
+              <h4>📄 ${escapeHtml(f.name)}</h4>
+              <div class="file-meta">Tab Sheet: <strong>${escapeHtml(f.sheet)}</strong><br/>
+              ${Number(f.count || 0).toLocaleString()} rekod • ${headers.length} kolum • ${fmtUploadDate(f.uploadedAt)}<br/>
+              ${f.hasKod ? '<span style="color:#059669;font-weight:700;">✓ Ada KODSEKOLAH</span>' : '<span style="color:#92400e;font-weight:700;">Tiada KODSEKOLAH</span>'}</div>
+            </div>
+            <span class="school-badge" style="margin:0;">${Number(f.count || 0).toLocaleString()} rekod</span>
+          </div>
+          <div>
+            <div class="preview-sub" style="margin-bottom:6px;"><strong>Header kolum &amp; contoh data (baris pertama):</strong></div>
+            ${headers.length ? sampleTableHtml(headers, sample, 6) : '<div class="preview-sub">Tiada header direkodkan.</div>'}
+            ${headerChipsHtml(headers, sample)}
+          </div>
+          <div class="file-actions">
+            <button class="btn-3d btn-white btn-sm" data-view-file="${idx}" type="button">👁️ Lihat Header Penuh</button>
+            <button class="btn-3d btn-danger-soft btn-sm" data-delete-file="${idx}" type="button">🗑️ Padam Fail Ini</button>
+          </div>
+        </div>`;
+      }).join('');
+
+      wrap.querySelectorAll('[data-delete-file]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const f = state.files[Number(btn.dataset.deleteFile)];
+          if (!f) return;
+          if (!confirm(`Padam fail "${f.name}"?\n\nData dalam Google Sheet (tab ${f.sheet}, ${Number(f.count || 0).toLocaleString()} rekod) juga akan dipadam dan TIDAK boleh dikembalikan.`)) return;
+          btn.disabled = true;
+          try {
+            const res = await callGAS({ action: 'deleteFile', fileName: f.name });
+            showToast(res.message || `Fail "${f.name}" telah dipadam.`);
+            await loadMetadata();
+            await loadFiles();
+          } catch (err) {
+            showToast('Gagal padam: ' + err.message, true);
+            btn.disabled = false;
+          }
+        });
+      });
+      wrap.querySelectorAll('[data-view-file]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const f = state.files[Number(btn.dataset.viewFile)];
+          if (!f) return;
+          const headers = Array.isArray(f.headers) ? f.headers : [];
+          const sample = Array.isArray(f.sample) ? f.sample : [];
+          showToast(`"${f.name}": ${headers.length} kolum — ${headers.join(', ')}`);
+          const card = btn.closest('.file-card');
+          if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      });
     }
 
     /* ========================================================================

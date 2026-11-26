@@ -19,7 +19,12 @@ const CONFIG = {
     MURID: '',
     GURU: '',
     AKP: ''
-  }
+  },
+  // v13: Senarai fail generik (satu butang upload). Setiap fail yang dimuat
+  // naik didaftarkan di tab ini supaya TIDAK HILANG selagi tidak dipadam:
+  // nama fail, nama tab Sheet, header (JSON), contoh baris pertama (JSON),
+  // jumlah rekod, tarikh muat naik & sama ada ada KODSEKOLAH.
+  REGISTRY_SHEET: '_SENARAI_FAIL'
 };
 
 /**
@@ -36,8 +41,9 @@ function setupSistem() {
     }
     sheet.setFrozenRows(1);
   });
+  getRegistrySheet_();
 
-  return 'Persediaan 3 tab pangkalan data (DATA_MURID, DATA_GURU, DATA_AKP) berjaya.';
+  return 'Persediaan 3 tab pangkalan data (DATA_MURID, DATA_GURU, DATA_AKP) + tab _SENARAI_FAIL berjaya.';
 }
 
 /**
@@ -48,7 +54,7 @@ function doGet(e) {
     status: 'ok',
     app: 'dashboard-data-sekolah',
     message: 'API Dashboard Data Sekolah aktif.',
-    version: '3.0'
+    version: '4.0'
   });
 }
 
@@ -100,6 +106,19 @@ function doPost(e) {
 
     if (action === 'uploadBatch') {
       return jsonResponse_(handleUploadBatch_(req));
+    }
+
+    // v13 — fail Excel generik (satu butang upload)
+    if (action === 'listFiles') {
+      return jsonResponse_({ status: 'success', files: listFiles_() });
+    }
+
+    if (action === 'uploadFileBatch') {
+      return jsonResponse_(handleUploadFileBatch_(req));
+    }
+
+    if (action === 'deleteFile') {
+      return jsonResponse_(deleteFile_(req.fileName || req.sheetName || ''));
     }
 
     return jsonResponse_({ status: 'error', message: 'Tindakan tidak dikenali: ' + action });
@@ -404,11 +423,15 @@ function handleGetMetadata_() {
     .sort()
     .map(function (k) { return schoolMap[k]; });
 
+  let filesList = [];
+  try { filesList = listFiles_(); } catch (e) { filesList = []; }
+
   return {
     status: 'success',
     headers: headersMap,
     counts: countsMap,
     schools: schools,
+    files: filesList,
     index: indexMap,
     builtAt: new Date().toISOString()
   };
@@ -713,12 +736,267 @@ function handleUploadBatch_(req) {
       targetRange.setValues(normalizedRows);
     }
 
+    const totalNow = Math.max(0, sheet.getLastRow() - 1);
+    try {
+      registerFile_(category, CONFIG.SHEETS[category],
+        batchIndex === 0 ? headers : null,
+        (batchIndex === 0 && rows.length) ? rows[0] : null,
+        totalNow);
+    } catch (e) {}
+
     return {
       status: 'success',
       category: category,
       batchIndex: batchIndex,
       rowsWritten: rows.length,
-      totalRowsNow: Math.max(0, sheet.getLastRow() - 1)
+      totalRowsNow: totalNow
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * ============================================================================
+ * v13 — FAIL EXCEL GENERIK (SATU BUTANG UPLOAD)
+ * Satu nama fail daripada pengguna -> satu tab Google Sheet (DATA_<NAMA>).
+ * Daftar fail disimpan dalam tab _SENARAI_FAIL (bukan dalam pelayar sahaja),
+ * jadi senarai kekal selagi pengguna tidak tekan Padam — tutup app, tukar
+ * telefon atau buka semula pun fail masih ada di app & di Google Sheet.
+ * Setiap fail menyimpan header + contoh baris data pertama untuk dipaparkan.
+ * ============================================================================
+ */
+
+function sheetNameForFile_(fileName) {
+  const raw = String(fileName || '').trim().toUpperCase();
+  const norm = raw.replace(/[^A-Z0-9]/g, '');
+  if (norm === 'MURID' || raw.indexOf('MURID') !== -1) return CONFIG.SHEETS.MURID;
+  if (norm === 'GURU' || raw.indexOf('GURU') !== -1) return CONFIG.SHEETS.GURU;
+  if (norm === 'AKP' || raw.indexOf('AKP') !== -1) return CONFIG.SHEETS.AKP;
+  let clean = raw.replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!clean) clean = 'FAIL';
+  clean = clean.substring(0, 40);
+  return 'DATA_' + clean;
+}
+
+function getRegistrySheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CONFIG.REGISTRY_SHEET);
+  if (!sheet) sheet = ss.insertSheet(CONFIG.REGISTRY_SHEET);
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, 7).setValues([[
+      'NAMA_FAIL', 'NAMA_SHEET', 'HEADER_JSON', 'CONTOH_JSON',
+      'JUMLAH_REKOD', 'TARIKH_MUAT_NAIK', 'KODSEKOLAH_ADA'
+    ]]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function parseJsonCell_(v, fallback) {
+  try {
+    const t = String(v || '').trim();
+    if (!t) return fallback;
+    const out = JSON.parse(t);
+    return out == null ? fallback : out;
+  } catch (e) { return fallback; }
+}
+
+function registerFile_(fileName, sheetName, headers, sampleRow, totalRows) {
+  const reg = getRegistrySheet_();
+  const lastRow = reg.getLastRow();
+  const hasKod = headers
+    ? headers.some(function (h) { return String(h || '').toUpperCase().replace(/[^A-Z0-9]/g, '').indexOf('KODSEKOLAH') !== -1; })
+    : false;
+  let foundRow = -1;
+  let oldHeaders = null, oldSample = null, oldHasKod = false;
+  if (lastRow >= 2) {
+    const vals = reg.getRange(2, 1, lastRow - 1, 7).getValues();
+    for (let i = 0; i < vals.length; i++) {
+      if (String(vals[i][1] || '').trim().toUpperCase() === String(sheetName).toUpperCase()) {
+        foundRow = i + 2;
+        oldHeaders = parseJsonCell_(vals[i][2], []);
+        oldSample = parseJsonCell_(vals[i][3], []);
+        oldHasKod = String(vals[i][6] || '').toUpperCase() === 'YA';
+        break;
+      }
+    }
+  }
+  const finalHeaders = headers && headers.length ? headers : oldHeaders;
+  const finalSample = sampleRow && sampleRow.length ? sampleRow : oldSample;
+  const finalHasKod = headers ? hasKod : oldHasKod;
+  const row = [
+    String(fileName || sheetName),
+    String(sheetName),
+    JSON.stringify(finalHeaders || []),
+    JSON.stringify(finalSample || []),
+    Number(totalRows || 0),
+    new Date().toISOString(),
+    finalHasKod ? 'YA' : 'TIDAK'
+  ];
+  if (foundRow !== -1) reg.getRange(foundRow, 1, 1, 7).setValues([row]);
+  else reg.appendRow(row);
+  return { fileName: row[0], sheetName: sheetName };
+}
+
+function discoverExistingSheets_() {
+  // v13: Data lama (DATA_MURID/GURU/AKP atau DATA_* lain) yang sudah ada
+  // dalam Google Sheet sebelum v13 mesti muncul dalam senarai tanpa perlu
+  // muat naik semula — daftarkan automatik jika belum ada dalam registry.
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const reg = getRegistrySheet_();
+    const lastRow = reg.getLastRow();
+    const known = {};
+    if (lastRow >= 2) {
+      reg.getRange(2, 2, lastRow - 1, 1).getValues().forEach(function (r) {
+        known[String(r[0] || '').trim().toUpperCase()] = true;
+      });
+    }
+    ss.getSheets().forEach(function (sh) {
+      const name = sh.getName();
+      if (name === CONFIG.REGISTRY_SHEET || name.indexOf('DATA_') !== 0) return;
+      if (known[name.toUpperCase()]) return;
+      if (sh.getLastRow() < 1 || sh.getLastColumn() < 1) return;
+      const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+        .map(function (h) { return String(h || '').trim(); });
+      if (!headers.some(function (h) { return h !== ''; })) return;
+      const sample = sh.getLastRow() >= 2
+        ? sh.getRange(2, 1, 1, sh.getLastColumn()).getDisplayValues()[0]
+        : [];
+      const label = name.replace(/^DATA_/, '').replace(/_/g, ' ').toLowerCase()
+        .replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+      registerFile_(label, name, headers, sample, Math.max(0, sh.getLastRow() - 1));
+    });
+  } catch (e) {}
+}
+
+function listFiles_() {
+  discoverExistingSheets_();
+  const reg = getRegistrySheet_();
+  const lastRow = reg.getLastRow();
+  if (lastRow < 2) return [];
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const vals = reg.getRange(2, 1, lastRow - 1, 7).getValues();
+  const out = [];
+  vals.forEach(function (r) {
+    const sheetName = String(r[1] || '').trim();
+    if (!sheetName) return;
+    let count = Number(r[4] || 0);
+    try {
+      const sh = ss.getSheetByName(sheetName);
+      if (sh) count = Math.max(0, sh.getLastRow() - 1);
+    } catch (e) {}
+    out.push({
+      name: String(r[0] || sheetName),
+      sheet: sheetName,
+      headers: parseJsonCell_(r[2], []),
+      sample: parseJsonCell_(r[3], []),
+      count: count,
+      uploadedAt: String(r[5] || ''),
+      hasKod: String(r[6] || '').toUpperCase() === 'YA'
+    });
+  });
+  out.sort(function (a, b) { return String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || '')); });
+  return out;
+}
+
+function deleteFile_(fileNameOrSheet) {
+  const key = String(fileNameOrSheet || '').trim().toUpperCase();
+  if (!key) return { status: 'error', message: 'Sila nyatakan nama fail yang hendak dipadam.' };
+  const reg = getRegistrySheet_();
+  const lastRow = reg.getLastRow();
+  if (lastRow < 2) return { status: 'error', message: 'Fail tidak ditemui dalam senarai.' };
+  const vals = reg.getRange(2, 1, lastRow - 1, 2).getValues();
+  let foundRow = -1, sheetName = '', fileName = '';
+  for (let i = 0; i < vals.length; i++) {
+    const n = String(vals[i][0] || '').trim().toUpperCase();
+    const sh = String(vals[i][1] || '').trim().toUpperCase();
+    if (n === key || sh === key) { foundRow = i + 2; fileName = String(vals[i][0]); sheetName = String(vals[i][1]); break; }
+  }
+  if (foundRow === -1) return { status: 'error', message: 'Fail tidak ditemui dalam senarai.' };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(sheetName);
+  if (sh) ss.deleteSheet(sh);
+  reg.deleteRow(foundRow);
+  invalidateMetadata_();
+  return { status: 'success', deleted: fileName, sheet: sheetName, message: 'Fail "' + fileName + '" telah dipadam dari app dan Google Sheet.' };
+}
+
+function handleUploadFileBatch_(req) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const fileName = String(req.fileName || '').trim();
+    if (fileName.length < 2) {
+      return { status: 'error', message: 'Sila isi Nama Fail (contoh: Murid, Guru, AKP, Kehadiran).' };
+    }
+    const sheetName = sheetNameForFile_(fileName);
+    const mode = req.mode === 'append' ? 'append' : 'replace';
+    const batchIndex = Number(req.batchIndex || 0);
+    const headers = Array.isArray(req.headers) ? req.headers : [];
+    const rows = Array.isArray(req.rows) ? req.rows : [];
+    if (!headers.length) return { status: 'error', message: 'Fail tiada header (baris pertama kosong).' };
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(sheetName);
+    if (!sheet) { sheet = ss.insertSheet(sheetName); sheet.setFrozenRows(1); }
+
+    // Append: header fail baru mesti sama dengan header sedia ada — elak data bercampur kolum.
+    if (mode === 'append' && batchIndex === 0 && sheet.getLastRow() >= 1) {
+      const existing = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+        .map(function (h) { return String(h || '').trim(); });
+      const same = existing.length === headers.length &&
+        existing.every(function (h, i) { return h.toUpperCase() === String(headers[i] || '').trim().toUpperCase(); });
+      if (existing.length && !same) {
+        return { status: 'error', message: 'Header fail ini tidak sama dengan fail "' + fileName + '" yang sedia ada. Guna mod Ganti, atau pastikan header sama sebelum Tambah.' };
+      }
+    }
+
+    invalidateMetadata_();
+
+    if (batchIndex === 0) {
+      if (mode === 'replace') {
+        sheet.clearContents();
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        sheet.setFrozenRows(1);
+      } else if (sheet.getLastRow() === 0) {
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        sheet.setFrozenRows(1);
+      }
+    }
+
+    if (rows.length > 0) {
+      const colCount = headers.length > 0 ? headers.length : sheet.getLastColumn();
+      const normalizedRows = rows.map(function (r) {
+        const out = new Array(colCount);
+        for (let c = 0; c < colCount; c++) {
+          out[c] = (r[c] === undefined || r[c] === null) ? '' : String(r[c]);
+        }
+        return out;
+      });
+      const startRow = sheet.getLastRow() + 1;
+      const targetRange = sheet.getRange(startRow, 1, normalizedRows.length, colCount);
+      targetRange.setNumberFormat('@');
+      targetRange.setValues(normalizedRows);
+    }
+
+    const totalNow = Math.max(0, sheet.getLastRow() - 1);
+    try {
+      registerFile_(fileName, sheetName,
+        batchIndex === 0 ? headers : null,
+        (batchIndex === 0 && rows.length) ? rows[0] : null,
+        totalNow);
+    } catch (e) {}
+
+    return {
+      status: 'success',
+      fileName: fileName,
+      sheetName: sheetName,
+      category: sheetName,
+      batchIndex: batchIndex,
+      rowsWritten: rows.length,
+      totalRowsNow: totalNow
     };
   } finally {
     lock.releaseLock();
