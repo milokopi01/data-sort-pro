@@ -2,7 +2,7 @@
 <html lang="ms">
 <head>
   <meta charset="UTF-8" />
-  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbw94i8ZoOg28766FCo7P6kDriPKZxE1HYji-CYAwNlkK2AnIOkM6f4-LzUUcXm18fYncw/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
+  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbxETiJq_X5aHOvBTvkb7S52QRoF5Ot6od1AxdDopBCcY3PKcmBRGe6AAq-xEKe_8m8t_w/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -1484,6 +1484,31 @@
     }
 
     const META_LS_KEY = 'ds_meta_cache_v1';
+    // v21: cache senarai fail BERASINGAN — senarai fail mesti muncul
+    // serta-merta daripada simpanan peranti, tanpa menunggu getMetadata
+    // yang berat (bina indeks 58k+ baris) atau cold start Apps Script.
+    const FILES_LS_KEY = 'ds_files_cache_v1';
+    function loadCachedFiles() {
+      try {
+        const c = JSON.parse(localStorage.getItem(FILES_LS_KEY) || 'null');
+        if (Array.isArray(c) && c.length) return c;
+      } catch (e) {}
+      return null;
+    }
+    function saveCachedFiles(files) {
+      try {
+        if (Array.isArray(files) && files.length) localStorage.setItem(FILES_LS_KEY, JSON.stringify(files));
+      } catch (e) {}
+    }
+    function paintCachedFiles() {
+      const cf = loadCachedFiles();
+      if (cf) {
+        state.files = cf;
+        state.filesLoaded = true;
+        state.filesStale = true; // paparan terakhir — sedang disegarkan di latar
+        renderFileList();
+      }
+    }
 
     function loadCachedMetadata() {
       try {
@@ -1495,11 +1520,13 @@
 
     async function initMetadata() {
       // Papar indeks tersimpan serta-merta, kemudian segarkan di latar belakang
+      paintCachedFiles(); // v21: senarai fail terus muncul — jangan tunggu rangkaian
       const cached = loadCachedMetadata();
       if (cached) {
         applyMetadata(cached);
         setConnStatus(true, `${cached.schools.length} Sekolah`);
       }
+      loadFiles(); // v21: laluan RINGAN (listFiles) selari — jangan tunggu getMetadata yang berat
       await loadMetadata(!!cached);
     }
 
@@ -1592,7 +1619,7 @@
 
         // v13: senarai fail generik dari Google Sheet (kekal selagi tidak dipadam)
         state.files = Array.isArray(res.files) ? res.files : (state.files || []);
-        if (Array.isArray(res.files)) state.filesLoaded = true;
+        if (Array.isArray(res.files)) { state.filesLoaded = true; state.filesStale = false; saveCachedFiles(state.files); }
         renderFileList();
         if (!Array.isArray(res.files)) loadFiles();
 
@@ -3600,9 +3627,16 @@
     });
     document.getElementById('btnClearGeneric').addEventListener('click', clearGenericUpload);
     document.getElementById('btnUploadGeneric').addEventListener('click', runGenericUpload);
-    document.getElementById('btnRefreshFiles').addEventListener('click', async () => {
-      await loadFiles();
-      showToast('Senarai fail telah disegarkan.');
+    document.getElementById('btnRefreshFiles').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const old = btn.textContent;
+      btn.textContent = '⏳ Menyegar...';
+      const ok = await loadFiles();
+      btn.disabled = false;
+      btn.textContent = old;
+      showToast(ok ? 'Senarai fail telah disegarkan.' : 'Gagal menyegar senarai fail. Cuba lagi sebentar lagi.', !ok);
     });
 
     async function runGenericUpload() {
@@ -3689,16 +3723,26 @@
     }
 
     /* ---------- Senarai fail kekal (dari Google Sheet) ---------- */
+    let filesLoadTimer = null;
     async function loadFiles() {
+      state.filesLoading = true;
+      renderFileList();
       try {
         const res = await callGAS({ action: 'listFiles' });
         state.files = Array.isArray(res.files) ? res.files : [];
-        if (Array.isArray(res.files)) state.filesLoaded = true;
+        if (Array.isArray(res.files)) { state.filesLoaded = true; state.filesStale = false; saveCachedFiles(state.files); }
         renderFileList();
         return true;
       } catch (err) {
+        // v21: jangan padam senarai lama bila gagal — kekalkan paparan
+        // terakhir dan cuba semula sekali secara automatik (tanpa refresh).
         renderFileList();
+        if (!loadFiles._retryTimer) {
+          loadFiles._retryTimer = setTimeout(() => { loadFiles._retryTimer = null; loadFiles(); }, 4000);
+        }
         return false;
+      } finally {
+        state.filesLoading = false;
       }
     }
 
@@ -3715,6 +3759,27 @@
       if (!wrap) return;
       const files = state.files || [];
       document.getElementById('fileListCount').textContent = files.length ? `(${files.length} fail)` : '';
+      // v21: semasa senarai masih dimuat, tunjukkan MEMUAT — bukan "Belum ada
+      // fail". Mesej kosong itu yang membuat pengguna sangka data hilang dan
+      // refresh berkali-kali (setiap refresh pula memulakan semula muatan).
+      if (!state.filesLoaded) {
+        if (!filesLoadTimer) {
+          const t0 = Date.now();
+          filesLoadTimer = setInterval(() => {
+            const el = wrap.querySelector('[data-files-elapsed]');
+            if (el) el.textContent = Math.round((Date.now() - t0) / 1000);
+            else { clearInterval(filesLoadTimer); filesLoadTimer = null; }
+          }, 1000);
+        }
+        wrap.innerHTML = `
+          <div class="card-3d empty-state" style="grid-column:1/-1; padding:28px;">
+            <div style="font-size:2rem; margin-bottom:8px;">⏳</div>
+            <h3 style="font-size:1rem; font-weight:800; margin-bottom:4px;">Memuat senarai fail dari Google Sheet... <b data-files-elapsed>0</b> saat</h3>
+            <p style="font-size:0.86rem;">Fail yang dimuat naik sebelum ini sedang diambil. Jangan refresh — senarai akan muncul sendiri sebaik sahaja selesai.</p>
+          </div>`;
+        return;
+      }
+      if (filesLoadTimer) { clearInterval(filesLoadTimer); filesLoadTimer = null; }
       if (!files.length) {
         wrap.innerHTML = `
           <div class="card-3d empty-state" style="grid-column:1/-1; padding:28px;">
@@ -3724,7 +3789,10 @@
           </div>`;
         return;
       }
-      wrap.innerHTML = files.map((f, idx) => {
+      const staleNote = state.filesStale
+        ? `<div style="grid-column:1/-1; font-size:.8rem; color:var(--text-muted);">Memaparkan senarai terakhir — sedang disegarkan dari Google Sheet...</div>`
+        : '';
+      wrap.innerHTML = staleNote + files.map((f, idx) => {
         const headers = Array.isArray(f.headers) ? f.headers : [];
         const sample = Array.isArray(f.sample) ? f.sample : [];
         return `

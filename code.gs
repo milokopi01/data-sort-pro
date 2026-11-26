@@ -2,6 +2,8 @@
  * ============================================================================
  * BACKEND SISTEM DASHBOARD DATA SEKOLAH (MURID, GURU & AKP)
  * Sokongan: Muat Naik Batch Excel, Carian Kod Sekolah, Keselamatan PIN 101010
+ * Versi: 4.3 (v21) — listFiles_() lebih pantas: guna kiraan dalam registry,
+ * jangan panggil getLastRow() untuk setiap fail.
  * ============================================================================
  */
 
@@ -891,11 +893,17 @@ function listFiles_() {
   vals.forEach(function (r) {
     const sheetName = String(r[1] || '').trim();
     if (!sheetName) return;
+    // v21: guna kiraan yang tersimpan dalam registry (dikemas kini semasa
+    // muat naik / tindan / sambung) — jangan panggil getLastRow() untuk
+    // setiap fail, itu yang melambatkan senarai. Hanya semak Sheet jika
+    // kiraan tersimpan tiada.
     let count = Number(r[4] || 0);
-    try {
-      const sh = ss.getSheetByName(sheetName);
-      if (sh) count = Math.max(0, sh.getLastRow() - 1);
-    } catch (e) {}
+    if (!count) {
+      try {
+        const sh = ss.getSheetByName(sheetName);
+        if (sh) count = Math.max(0, sh.getLastRow() - 1);
+      } catch (e) {}
+    }
     out.push({
       name: String(r[0] || sheetName),
       sheet: sheetName,
