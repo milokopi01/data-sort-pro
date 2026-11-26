@@ -2,7 +2,7 @@
 <html lang="ms">
 <head>
   <meta charset="UTF-8" />
-  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbw94i8ZoOg28766FCo7P6kDriPKZxE1HYji-CYAwNlkK2AnIOkM6f4-LzUUcXm18fYncw/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
+  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbxETiJq_X5aHOvBTvkb7S52QRoF5Ot6od1AxdDopBCcY3PKcmBRGe6AAq-xEKe_8m8t_w/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -2326,6 +2326,9 @@
       const ADV_COLORS = ['#059669', '#4f46e5', '#d97706', '#2563eb', '#0891b2', '#db2777', '#65a30d', '#9333ea', '#ea580c', '#0d9488'];
       const normalizeAdvCat = c => c === 'MURID' ? 'DATA_MURID' : c === 'GURU' ? 'DATA_GURU' : c === 'AKP' ? 'DATA_AKP' : String(c || '');
       adv.cats = (adv.cats || []).map(normalizeAdvCat);
+      // v18: lalai kolum senarai berubah (lihat defaultListCols) — buang
+      // pilihan kolum lama yang tersimpan supaya senarai tidak kekal 2 kolum.
+      if (adv.listColsVer !== 'v18') { adv.listCols = {}; adv.listColsVer = 'v18'; save(); }
       function advSheets() { return (state.files || []).map(f => f.sheet); }
       function advFileFor(sheet) { return (state.files || []).find(f => f.sheet === sheet) || null; }
       function advFileLabel(sheet) { const f = advFileFor(sheet); return f ? f.name : (sheet || ''); }
@@ -2368,7 +2371,7 @@
           </label>`).join('');
         wrap.querySelectorAll('[data-adv-cat]').forEach(cb => cb.addEventListener('change', () => {
           adv.cats = [...document.querySelectorAll('[data-adv-cat]:checked')].map(x => x.dataset.advCat);
-          closeAdvMenu(); save(); renderAdv();
+          closeAdvMenu(); save(); renderAdv(); scheduleAdvRerun();
         }));
       }
       const det = document.getElementById('advDetails');
@@ -2506,7 +2509,7 @@
             openCondMenu(i);
             return;
           }
-          c.mode = m; save(); renderAdv(); closeAdvMenu();
+          c.mode = m; save(); renderAdv(); closeAdvMenu(); scheduleAdvRerun();
           const inp = document.querySelector(`#advConds input[data-ci="${i}"][data-f="value"]`);
           if (inp && !inp.disabled) inp.focus();
         }));
@@ -2667,7 +2670,7 @@
           const allPicked = !truncated && !q && !serverSearch && chosen.length === values.length;
           c.mode = 'in';
           c.values = allPicked ? [] : chosen;
-          save(); closeAdvMenu(); renderAdv();
+          save(); closeAdvMenu(); renderAdv(); scheduleAdvRerun();
         });
       }
 
@@ -2700,7 +2703,7 @@
           const c = adv.conds[+el.dataset.ci];
           c[el.dataset.f] = el.value;
           if (el.dataset.f === 'col') { c.values = []; renderAdv(); }
-          save();
+          save(); scheduleAdvRerun();
         }));
         document.querySelectorAll('#advConds [data-cmenu]').forEach(b => b.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -2709,7 +2712,7 @@
           openCondMenu(i);
         }));
         document.querySelectorAll('#advConds [data-cdel]').forEach(b => b.addEventListener('click', () => {
-          adv.conds.splice(+b.dataset.cdel, 1); save(); renderAdv();
+          adv.conds.splice(+b.dataset.cdel, 1); save(); renderAdv(); scheduleAdvRerun();
         }));
       }
       window.renderAdvPanel = renderAdv;
@@ -2729,7 +2732,12 @@
         const add = c => { if (c && heads.includes(c) && !pick.includes(c)) pick.push(c); };
         heads.filter(h => /^KOD_?SEKOLAH$/i.test(h) || /^NAMA_?SEKOLAH$/i.test(h) || /^NEGERI$/i.test(h) || /^PPD$/i.test(h)).forEach(add);
         (lastRun ? lastRun.conds : []).forEach(c => add(c.col));
-        return pick.length ? pick : heads.slice(0, 10);
+        // v18: tambah kolum pengenalan (nama orang, NOKP, jawatan...) supaya
+        // baris dalam senarai boleh dibezakan — sebelum ini carian ikut
+        // sekolah hanya papar NAMA_SEKOLAH + KODSEKOLAH, 25 baris nampak sama.
+        heads.filter(h => /^(NAMA|NOKP|NO_?KP|KAD_?PENGENALAN|JAWATAN|GRED|KATEGORI|STATUS|JANTINA|BANGSA)/i.test(h)).forEach(add);
+        if (pick.length < 4) heads.slice(0, 10).forEach(add);
+        return pick.length ? pick.slice(0, 10) : heads.slice(0, 10);
       }
       function listColsFor(cat) {
         const heads = headersForAdv(cat);
@@ -2742,13 +2750,14 @@
       const rowsCache = new Map(); // kunci -> { p: Promise, t: masa }
       const ROWS_TTL = 10 * 60 * 1000;
       function rowsKey(cat) {
-        return JSON.stringify([state.metadata.dataVer || '', cat, lastRun ? lastRun.conds : [], listColsFor(cat), adv.listLimit]);
+        // v18: kunci cache ikut syarat semasa (validConds), bukan lastRun.
+        return JSON.stringify([state.metadata.dataVer || '', cat, validConds(-1), listColsFor(cat), adv.listLimit]);
       }
       function fetchRows(cat, force) {
         const key = rowsKey(cat);
         const hit = rowsCache.get(key);
         if (hit && !force && Date.now() - hit.t < ROWS_TTL) return hit.p;
-        const p = callGAS({ action: 'queryRows', category: cat, conditions: lastRun.conds, columns: listColsFor(cat), limit: adv.listLimit, refresh: !!force });
+        const p = callGAS({ action: 'queryRows', category: cat, conditions: validConds(-1), columns: listColsFor(cat), limit: adv.listLimit, refresh: !!force });
         const entry = { p, t: Date.now(), done: false };
         rowsCache.set(key, entry);
         p.then(() => { entry.done = true; }, () => { if (rowsCache.get(key) === entry) rowsCache.delete(key); });
@@ -2761,7 +2770,11 @@
 
       let loadToken = 0;
       async function loadList(cat, force) {
-        if (!lastRun) return;
+        // v18: Papar Senarai sentiasa guna syarat TERKINI — kalau pengguna
+        // sudah tukar syarat/fail selepas Kira Jumlah, senarai yang keluar
+        // mesti ikut pilihan baharu itu, bukan kiraan lama.
+        const curConds = validConds(-1);
+        lastRun = { conds: curConds.map(c => ({ ...c, values: c.values ? c.values.slice() : undefined })), desc: describeAll(curConds) };
         const box = document.getElementById('advList');
         if (!box) return;
         closeFilterMenu();
@@ -2782,7 +2795,16 @@
         try {
           const res = await fetchRows(cat, force);
           if (token !== loadToken) return; // pengguna sudah tekan butang lain
-          list = { cat, headers: res.headers || [], rows: res.rows || [], count: res.count || 0, total: res.total || 0, truncated: !!res.truncated, sortIdx: -1, asc: true, filters: {}, page: 1, pageSize: (list && list.pageSize) || 100 };
+          // v18: kekalkan susun & tapis merentas perubahan kolum — dipetakan
+          // ikut NAMA kolum, bukan indeks (indeks berubah bila kolum berubah).
+          const oldSortHeader = list && list.sortIdx >= 0 ? list.headers[list.sortIdx] : null;
+          const oldSortAsc = list ? list.asc : true;
+          const oldFilters = {};
+          if (list && list.filters) Object.keys(list.filters).forEach(k => { const hh = list.headers[+k]; if (hh) oldFilters[hh] = list.filters[k]; });
+          const oldPageSize = (list && list.pageSize) || 100;
+          list = { cat, headers: res.headers || [], rows: res.rows || [], count: res.count || 0, total: res.total || 0, truncated: !!res.truncated, sortIdx: -1, asc: true, filters: {}, page: 1, pageSize: oldPageSize };
+          if (oldSortHeader) { const ni = list.headers.indexOf(oldSortHeader); if (ni >= 0) { list.sortIdx = ni; list.asc = oldSortAsc; } }
+          Object.keys(oldFilters).forEach(hh => { const ni = list.headers.indexOf(hh); if (ni >= 0) list.filters[ni] = oldFilters[hh]; });
           renderList();
           if (ready) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } catch (err) {
@@ -3114,9 +3136,28 @@
       }
       /* v15: pengikatan checkbox dibuat dalam renderAdvCats() — checkbox dijana semula setiap kali senarai fail berubah. */
       document.getElementById('advAddCond').addEventListener('click', () => {
-        adv.conds.push({ col: '', mode: 'in', value: '', values: [] }); save(); renderAdv();
+        adv.conds.push({ col: '', mode: 'in', value: '', values: [] }); save(); renderAdv(); scheduleAdvRerun();
       });
-      document.getElementById('advGroup').addEventListener('change', e => { adv.groupBy = e.target.value; save(); });
+      document.getElementById('advGroup').addEventListener('change', e => { adv.groupBy = e.target.value; save(); scheduleAdvRerun(); });
+      // v18: setiap perubahan pada fail / syarat / pecahan mesti merambat
+      // ke jumlah DAN ke senarai yang sedang terbuka — pengguna tidak perlu
+      // ingat untuk tekan Kira Jumlah semula setiap kali menukar pilihan.
+      let advRerunTimer = null, advRerunPending = false;
+      function scheduleAdvRerun() {
+        if (!lastRun) return;
+        if (!adv.cats.length) {
+          clearTimeout(advRerunTimer);
+          const out = document.getElementById('advResult');
+          if (out) out.innerHTML = '<div style="color:#64748b;">Sila tick sekurang-kurangnya satu fail di atas.</div>';
+          if (list) { list = null; const box = document.getElementById('advList'); if (box) box.innerHTML = ''; }
+          lastRun = null;
+          return;
+        }
+        const btn = document.getElementById('advRun');
+        if (btn && btn.disabled) { advRerunPending = true; return; }
+        clearTimeout(advRerunTimer);
+        advRerunTimer = setTimeout(() => { const b = document.getElementById('advRun'); if (b) b.click(); }, 700);
+      }
       document.getElementById('advRun').addEventListener('click', async () => {
         if (!adv.cats.length) { showToast('Sila tick sekurang-kurangnya satu fail di atas.', true); return; }
         closeAdvMenu();
@@ -3155,9 +3196,14 @@
           out.querySelectorAll('[data-adv-list]').forEach(b => b.addEventListener('click', () => loadList(b.dataset.advList)));
           // Mula ambil senarai di belakang tabir supaya "Papar Senarai" keluar serta-merta
           prefetchRows(adv.cats.filter(cat => res.results[cat] && res.results[cat].count > 0 && res.results[cat].count <= 60000));
+          // v18: kalau senarai sedang terbuka, ia mesti ikut syarat baharu juga.
+          if (list) loadList(list.cat);
         } catch (err) {
           out.innerHTML = `<div style="color:#dc2626;">Gagal: ${escapeHtml(err.message || String(err))}</div>`;
-        } finally { btn.disabled = false; }
+        } finally {
+          btn.disabled = false;
+          if (advRerunPending) { advRerunPending = false; scheduleAdvRerun(); }
+        }
       });
       renderAdv();
     })();
