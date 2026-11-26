@@ -2,7 +2,7 @@
 <html lang="ms">
 <head>
   <meta charset="UTF-8" />
-  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbw94i8ZoOg28766FCo7P6kDriPKZxE1HYji-CYAwNlkK2AnIOkM6f4-LzUUcXm18fYncw/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
+  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbxETiJq_X5aHOvBTvkb7S52QRoF5Ot6od1AxdDopBCcY3PKcmBRGe6AAq-xEKe_8m8t_w/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -2454,8 +2454,21 @@
       async function fetchDistinct(col, others, search) {
         const key = JSON.stringify([adv.cats, col, others, search]);
         if (dvCache.has(key)) return dvCache.get(key);
-        const p = callGAS({ action: 'distinctValues', categories: adv.cats, col, conditions: others, search, limit: 3000 })
-          .catch(err => { dvCache.delete(key); throw err; });
+        // v17: cuba nama tab DATA_* dahulu; kalau backend lama (belum deploy v4.2+),
+        // ia tolak kategori itu — cuba semula dengan nama lama MURID/GURU/AKP.
+        const legacyCats = adv.cats.map(c => ({ DATA_MURID: 'MURID', DATA_GURU: 'GURU', DATA_AKP: 'AKP' }[c] || c))
+          .filter(c => ['MURID', 'GURU', 'AKP'].includes(c));
+        const p = (async () => {
+          try {
+            return await callGAS({ action: 'distinctValues', categories: adv.cats, col, conditions: others, search, limit: 3000 });
+          } catch (err) {
+            const msg = err.message || String(err);
+            if (legacyCats.length && /pilih sekurang-kurangnya satu|tidak dikenali|tidak sah/i.test(msg)) {
+              return await callGAS({ action: 'distinctValues', categories: legacyCats, col, conditions: others, search, limit: 3000 });
+            }
+            throw err;
+          }
+        })().catch(err => { dvCache.delete(key); throw err; });
         dvCache.set(key, p);
         return p;
       }
@@ -2463,6 +2476,21 @@
       function openCondMenu(i) {
         const c = adv.conds[i];
         if (!c) return;
+        // v17: punca utama "sort tidak berfungsi" — baris yang kolumnya kosong
+        // (termasuk syarat lama yang kolumnya sudah tiada dalam fail) sebelum ini
+        // hanya membuka menu dengan nota "Sila pilih kolum dahulu" dan tiada
+        // senarai nilai langsung. Sekarang: fokuskan kotak kolum itu terus.
+        if (!c.col) {
+          showToast('Pilih kolum dahulu di kotak sebelah kiri.', true);
+          const sel = document.querySelector(`#advConds select[data-ci="${i}"][data-f="col"]`);
+          if (sel) {
+            sel.focus();
+            sel.style.borderColor = '#dc2626';
+            sel.style.boxShadow = '0 0 0 4px rgba(220,38,38,.18)';
+            setTimeout(() => { sel.style.borderColor = ''; sel.style.boxShadow = ''; }, 2000);
+          }
+          return;
+        }
         const seq = ++menuSeq;
         advMenu.dataset.ci = String(i);
         const modes = [['in', '☑ Pilih & tick nilai'], ['contains', 'Mengandungi teks'], ['equals', 'Sama dengan teks'], ['notempty', 'Tidak kosong']];
@@ -2502,6 +2530,11 @@
         const prevSel = new Set((c.values || []).map(normV));
         const startAll = prevSel.size === 0;
         let values = [], truncated = false, touched = false, serverSearch = '', searchTimer = null;
+        // v17: papar 150 nilai dahulu supaya menu tidak beku bila kolum ada
+        // ribuan nilai unik (cth. NAMA / NOKP). Pilihan disimpan dalam `picked`
+        // supaya tick tidak hilang bila tekan "Tunjuk lagi".
+        let shown = 150;
+        let picked = new Set(prevSel);
 
         body.innerHTML = `
           <input type="text" class="fm-search" placeholder="Cari nilai..." />
@@ -2530,19 +2563,39 @@
         }
         function renderValues(checkAll) {
           if (!values.length) { listEl.innerHTML = `<div class="fm-load">Tiada nilai ditemui.</div>`; return; }
+          if (checkAll) picked = new Set(values.map(([v]) => normV(v)));
+          const slice = values.slice(0, shown);
           listEl.innerHTML = `<label class="fm-check"><input type="checkbox" data-av-all="1" /> <span class="v"><strong>(Pilih Semua)</strong></span></label>` +
-            values.map(([v, n], k) => `
+            slice.map(([v, n]) => {
+              const k = values.findIndex(x => x[0] === v && x[1] === n);
+              return `
               <label class="fm-check" data-av-row="${escapeHtml(normV(v))}">
-                <input type="checkbox" data-av="${k}" ${checkAll || prevSel.has(normV(v)) ? 'checked' : ''} />
+                <input type="checkbox" data-av="${k}" ${picked.has(normV(v)) ? 'checked' : ''} />
                 <span class="v" title="${escapeHtml(v)}">${v === '' ? '<em>(Kosong)</em>' : escapeHtml(v)}</span>
                 <span class="c">${Number(n).toLocaleString('ms-MY')}</span>
-              </label>`).join('');
+              </label>`;
+            }).join('') +
+            (values.length > shown
+              ? `<button type="button" class="btn-3d btn-white btn-sm" data-show-more style="width:100%; margin-top:6px;">Tunjuk 150 lagi (${shown.toLocaleString('ms-MY')} daripada ${values.length.toLocaleString('ms-MY')})</button>`
+              : '');
+          const moreBtn = listEl.querySelector('[data-show-more]');
+          if (moreBtn) moreBtn.addEventListener('click', () => { shown += 150; renderValues(false); });
           listEl.querySelector('[data-av-all]').addEventListener('change', (e) => {
             touched = true;
-            boxes().forEach(cb => { if (visible(cb)) cb.checked = e.target.checked; });
+            boxes().forEach(cb => {
+              if (!visible(cb)) return;
+              cb.checked = e.target.checked;
+              const v = values[Number(cb.dataset.av)][0];
+              if (e.target.checked) picked.add(normV(v)); else picked.delete(normV(v));
+            });
             syncAll();
           });
-          boxes().forEach(cb => cb.addEventListener('change', () => { touched = true; syncAll(); }));
+          boxes().forEach(cb => cb.addEventListener('change', () => {
+            touched = true;
+            const v = values[Number(cb.dataset.av)][0];
+            if (cb.checked) picked.add(normV(v)); else picked.delete(normV(v));
+            syncAll();
+          }));
           syncAll();
         }
         function setNote(res) {
@@ -2594,7 +2647,11 @@
             const row = cb.closest('.fm-check');
             const show = row.dataset.avRow.includes(q);
             row.style.display = show ? 'flex' : 'none';
-            if (q) cb.checked = show;
+            if (q) {
+              cb.checked = show;
+              const v = values[Number(cb.dataset.av)][0];
+              if (show) picked.add(normV(v)); else picked.delete(normV(v));
+            }
           });
           syncAll();
         });
@@ -2603,7 +2660,9 @@
         okBtn.addEventListener('click', () => {
           if (!touched) { closeAdvMenu(); return; }
           const q = normV(searchEl.value);
-          const chosen = boxes().filter(cb => cb.checked && visible(cb)).map(cb => values[Number(cb.dataset.av)][0]);
+          // v17: `picked` merangkumi nilai di halaman "Tunjuk lagi" juga,
+          // bukan hanya kotak yang sedang kelihatan.
+          const chosen = values.filter(([v]) => picked.has(normV(v))).map(([v]) => v);
           if (!chosen.length) { showToast('Sila tick sekurang-kurangnya satu nilai.', true); return; }
           const allPicked = !truncated && !q && !serverSearch && chosen.length === values.length;
           c.mode = 'in';
@@ -2615,6 +2674,16 @@
       function renderAdv() {
         renderAdvCats();
         const cols = allCols();
+        // v17: syarat lama yang kolumnya sudah tiada dalam fail yang ditick
+        // (cth. selepas tukar fail / nama kolum berubah) dikosongkan terus —
+        // sebelum ini ia tinggal sebagai baris kosong dengan nilai lama
+        // (cth. "1736 dipilih") yang tidak boleh dibuka langsung.
+        let pruned = false;
+        adv.conds.forEach(c => {
+          if (c.col && !cols.includes(c.col)) { c.col = ''; c.values = []; c.value = ''; pruned = true; }
+        });
+        if (adv.groupBy && !cols.includes(adv.groupBy)) { adv.groupBy = ''; pruned = true; }
+        if (pruned) save();
         document.getElementById('advConds').innerHTML = adv.conds.map((c, i) => `
           <div class="adv-cond">
             <select class="select-3d adv-sel" data-ci="${i}" data-f="col">${opts(cols, c.col, '— Pilih kolum —')}</select>
@@ -3056,7 +3125,16 @@
         const btn = document.getElementById('advRun');
         btn.disabled = true; out.innerHTML = '<div style="color:#64748b;">⏳ Mengira dalam semua data... (kali pertama boleh ambil masa beberapa saat)</div>';
         try {
-          const res = await callGAS({ action: 'queryStats', categories: adv.cats, conditions: conds, groupBy: adv.groupBy });
+          let res;
+          try {
+            res = await callGAS({ action: 'queryStats', categories: adv.cats, conditions: conds, groupBy: adv.groupBy });
+          } catch (err) {
+            const legacyCats = adv.cats.map(c => ({ DATA_MURID: 'MURID', DATA_GURU: 'GURU', DATA_AKP: 'AKP' }[c] || c))
+              .filter(c => ['MURID', 'GURU', 'AKP'].includes(c));
+            if (legacyCats.length && /pilih sekurang-kurangnya satu|tidak dikenali|tidak sah/i.test(err.message || '')) {
+              res = await callGAS({ action: 'queryStats', categories: legacyCats, conditions: conds, groupBy: adv.groupBy });
+            } else throw err;
+          }
           const fmt = n => Number(n).toLocaleString('ms-MY');
           const desc = escapeHtml(describeAll(conds));
           out.innerHTML = `<div style="font-size:.85rem;color:#64748b;margin-bottom:8px;">Syarat: ${desc}</div><div class="adv-res-grid">` +
