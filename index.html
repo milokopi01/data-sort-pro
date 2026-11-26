@@ -2,7 +2,7 @@
 <html lang="ms">
 <head>
   <meta charset="UTF-8" />
-  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbw94i8ZoOg28766FCo7P6kDriPKZxE1HYji-CYAwNlkK2AnIOkM6f4-LzUUcXm18fYncw/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
+  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbxETiJq_X5aHOvBTvkb7S52QRoF5Ot6od1AxdDopBCcY3PKcmBRGe6AAq-xEKe_8m8t_w/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -833,6 +833,26 @@
     .file-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .btn-danger-soft { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; border-bottom: 4px solid #fca5a5; }
     .btn-danger-soft:hover { background: #fee2e2; }
+    /* v16: Senarai fail sedia ada bila pilih Ganti / Sambung */
+    .existing-picker { margin-top: 12px; border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 12px; background: #ffffff; }
+    .existing-picker h5 { font-size: 0.9rem; font-weight: 800; margin-bottom: 3px; }
+    .existing-picker .pick-sub { font-size: 0.8rem; color: var(--text-sub); margin-bottom: 10px; }
+    .existing-list { display: flex; flex-direction: column; gap: 7px; max-height: 260px; overflow-y: auto; }
+    .existing-row {
+      display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+      padding: 10px 12px; border-radius: 11px; border: 1.5px solid #e2e8f0; border-bottom: 3px solid #cbd5e1;
+      background: #f8fafc; cursor: pointer; font: inherit;
+    }
+    .existing-row:hover { border-color: var(--primary); background: var(--primary-soft); }
+    .existing-row.selected { border-color: var(--primary); border-bottom-color: var(--primary); background: var(--primary-soft); }
+    .existing-row .radio-dot {
+      width: 18px; height: 18px; border-radius: 50%; border: 2px solid #94a3b8; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center; background: #fff;
+    }
+    .existing-row.selected .radio-dot { border-color: var(--primary); }
+    .existing-row.selected .radio-dot::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+    .existing-row .ex-name { font-weight: 800; font-size: 0.88rem; }
+    .existing-row .ex-meta { font-size: 0.76rem; color: var(--text-muted); font-weight: 600; }
 
     /* ================= MODAL PEMILIH KOLUM DINAMIK ================= */
     .modal-backdrop {
@@ -1160,6 +1180,12 @@
             <input type="radio" name="uploadMode" value="append" style="accent-color:var(--primary); margin-top:2px;" />
             <span>➕ Sambung ke Bawah — tambah baris baharu di bawah data sedia ada<br/><span style="font-weight:500; font-size:0.8rem; color:var(--text-sub);">Header fail baharu mesti sama dengan fail lama.</span></span>
           </label>
+        </div>
+        <div id="existingPicker" class="existing-picker" style="display:none;">
+          <h5 id="existingPickerTitle">📁 Pilih fail sedia ada</h5>
+          <div class="pick-sub" id="existingPickerSub"></div>
+          <div id="existingList" class="existing-list"></div>
+          <div id="existingPickerNote" style="font-size:0.8rem; font-weight:700; margin-top:9px;"></div>
         </div>
       </div>
 
@@ -3187,6 +3213,7 @@
     }
 
     function updateSheetPreview() {
+      renderExistingPicker();
       const name = document.getElementById('fileDisplayName').value;
       const mode = getUploadMode();
       const el = document.getElementById('sheetNamePreview');
@@ -3200,6 +3227,68 @@
         el.innerHTML = '🔄 Akan MENGGANTIKAN tab: <strong>' + escapeHtml(sheetNamePreviewFor(name)) + '</strong> — data lama dalam tab ini akan dipadam.';
       } else {
         el.innerHTML = '➕ Akan DITAMBAH di bawah tab: <strong>' + escapeHtml(sheetNamePreviewFor(name)) + '</strong> — baris baharu disambung di bawah data lama.';
+      }
+    }
+
+    // v16 — Bila pilih Ganti / Sambung, naikkan senarai fail sedia ada untuk dipilih.
+    function renderExistingPicker() {
+      const box = document.getElementById('existingPicker');
+      const listEl = document.getElementById('existingList');
+      const noteEl = document.getElementById('existingPickerNote');
+      if (!box || !listEl) return;
+      const mode = getUploadMode();
+      if (mode === 'new') { box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      const isReplace = mode === 'replace';
+      document.getElementById('existingPickerTitle').textContent = isReplace
+        ? '📁 Pilih fail sedia ada untuk DIGANTI'
+        : '📁 Pilih fail sedia ada untuk DISAMBUNG ke bawah';
+      document.getElementById('existingPickerSub').textContent = isReplace
+        ? 'Klik satu fail di bawah — data lamanya akan dipadam dan diganti dengan fail baharu ini.'
+        : 'Klik satu fail di bawah — baris baharu akan ditambah di bawah data fail ini.';
+      const files = state.files || [];
+      const typed = document.getElementById('fileDisplayName').value.trim();
+      if (!state.filesLoaded) {
+        listEl.innerHTML = `<div style="font-size:0.86rem; color:var(--text-muted);">Memuat senarai fail sedia ada...</div>`;
+        noteEl.textContent = '';
+        return;
+      }
+      if (!files.length) {
+        listEl.innerHTML = `<div style="font-size:0.86rem; color:var(--text-muted);">Belum ada fail sedia ada. Muat naik dahulu dengan <strong>Sheet Baharu</strong>, atau taip Nama Fail baharu di bawah.</div>`;
+        noteEl.textContent = '';
+        return;
+      }
+      listEl.innerHTML = files.map((f, idx) => {
+        const selected = typed && typed.toLowerCase() === String(f.name).toLowerCase();
+        return `
+          <button type="button" class="existing-row ${selected ? 'selected' : ''}" data-pick-file="${idx}">
+            <span class="radio-dot"></span>
+            <span style="flex:1; min-width:0;">
+              <span class="ex-name">📄 ${escapeHtml(f.name)}</span><br/>
+              <span class="ex-meta">${escapeHtml(f.sheet)} • ${Number(f.count || 0).toLocaleString()} rekod • ${(f.headers || []).length} kolum • ${fmtUploadDate(f.uploadedAt)}</span>
+            </span>
+            <span style="font-size:0.76rem; font-weight:800; color:var(--primary); flex-shrink:0;">${selected ? '✓ Dipilih' : 'Pilih'}</span>
+          </button>`;
+      }).join('');
+      listEl.querySelectorAll('[data-pick-file]').forEach(btn => btn.addEventListener('click', () => {
+        const f = state.files[Number(btn.dataset.pickFile)];
+        if (!f) return;
+        document.getElementById('fileDisplayName').value = f.name;
+        updateSheetPreview();
+        document.getElementById('fileDisplayName').focus();
+      }));
+      const matched = typed ? files.find(f => String(f.name).toLowerCase() === typed.toLowerCase()) : null;
+      if (!typed) {
+        noteEl.innerHTML = '👆 Sila klik satu fail di atas, atau taip Nama Fail di bawah.';
+        noteEl.style.color = 'var(--text-sub)';
+      } else if (matched) {
+        noteEl.innerHTML = isReplace
+          ? `✓ Sasaran: <strong>${escapeHtml(matched.name)}</strong> (${Number(matched.count || 0).toLocaleString()} rekod) — data ini akan DIGANTI.`
+          : `✓ Sasaran: <strong>${escapeHtml(matched.name)}</strong> (${Number(matched.count || 0).toLocaleString()} rekod) — baris baharu akan DISAMBUNG di bawahnya.`;
+        noteEl.style.color = '#047857';
+      } else {
+        noteEl.innerHTML = `⚠️ Nama Fail "${escapeHtml(typed)}" belum wujud dalam senarai — fail ini akan dicipta sebagai fail baharu, bukan ${isReplace ? 'mengganti' : 'menyambung'} fail lama. Klik satu fail di atas jika itu bukan niat anda.`;
+        noteEl.style.color = '#b45309';
       }
     }
 
@@ -3424,6 +3513,7 @@
     }
 
     function renderFileList() {
+      renderExistingPicker();
       updateSheetPreview();
       const wrap = document.getElementById('fileList');
       if (!wrap) return;
