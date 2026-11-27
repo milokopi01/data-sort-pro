@@ -4,6 +4,9 @@
  * Sokongan: Muat Naik Batch Excel, Carian Kod Sekolah, Keselamatan PIN 101010
  * Versi: 4.3 (v21) — listFiles_() lebih pantas: guna kiraan dalam registry,
  * jangan panggil getLastRow() untuk setiap fail.
+ * Versi: 4.4 (v23) — muat naik lebih pantas: invalidateMetadata_() dan
+ * registerFile_() hanya pada batch pertama/terakhir (bukan setiap batch);
+ * listFiles_(verify) semak kiraan sebenar bila diminta (butang Segar).
  * ============================================================================
  */
 
@@ -112,7 +115,7 @@ function doPost(e) {
 
     // v13 — fail Excel generik (satu butang upload)
     if (action === 'listFiles') {
-      return jsonResponse_({ status: 'success', files: listFiles_() });
+      return jsonResponse_({ status: 'success', files: listFiles_(req.verify === true || req.verify === 'true') });
     }
 
     if (action === 'uploadFileBatch') {
@@ -705,7 +708,8 @@ function handleUploadBatch_(req) {
     const sheet = getTargetSheet_(category);
 
     // Data berubah: indeks lama tidak sah lagi (akan dibina semula selepas muat naik)
-    invalidateMetadata_();
+    // v23: cukup sekali pada batch pertama — bukan setiap batch.
+    if (batchIndex === 0) invalidateMetadata_();
 
     // Batch pertama: tetapkan header atau kosongkan sheet jika mod Replace
     if (batchIndex === 0) {
@@ -739,12 +743,16 @@ function handleUploadBatch_(req) {
     }
 
     const totalNow = Math.max(0, sheet.getLastRow() - 1);
-    try {
-      registerFile_(category, CONFIG.SHEETS[category],
-        batchIndex === 0 ? headers : null,
-        (batchIndex === 0 && rows.length) ? rows[0] : null,
-        totalNow);
-    } catch (e) {}
+    // v23: daftar fail hanya pada batch pertama atau terakhir — bukan setiap batch.
+    const isLastLegacy = Number(req.totalRows || 0) > 0 && totalNow >= Number(req.totalRows);
+    if (batchIndex === 0 || isLastLegacy) {
+      try {
+        registerFile_(category, CONFIG.SHEETS[category],
+          batchIndex === 0 ? headers : null,
+          (batchIndex === 0 && rows.length) ? rows[0] : null,
+          totalNow);
+      } catch (e) {}
+    }
 
     return {
       status: 'success',
@@ -882,7 +890,7 @@ function discoverExistingSheets_() {
   } catch (e) {}
 }
 
-function listFiles_() {
+function listFiles_(verifyCounts) {
   discoverExistingSheets_();
   const reg = getRegistrySheet_();
   const lastRow = reg.getLastRow();
@@ -897,8 +905,11 @@ function listFiles_() {
     // muat naik / tindan / sambung) — jangan panggil getLastRow() untuk
     // setiap fail, itu yang melambatkan senarai. Hanya semak Sheet jika
     // kiraan tersimpan tiada.
+    // v23: verifyCounts=true (butang Segar) semak kiraan sebenar setiap fail
+    // — penting selepas fail diimport terus dalam Google Sheet (Fail >
+    // Import), supaya kiraan yang dipaparkan tepat walaupun registry lama.
     let count = Number(r[4] || 0);
-    if (!count) {
+    if (verifyCounts || !count) {
       try {
         const sh = ss.getSheetByName(sheetName);
         if (sh) count = Math.max(0, sh.getLastRow() - 1);
@@ -998,7 +1009,8 @@ function handleUploadFileBatch_(req) {
       }
     }
 
-    invalidateMetadata_();
+    // v23: cukup sekali pada batch pertama — bukan setiap batch.
+    if (batchIndex === 0) invalidateMetadata_();
 
     if (batchIndex === 0) {
       if (mode === 'replace') {
@@ -1027,12 +1039,15 @@ function handleUploadFileBatch_(req) {
     }
 
     const totalNow = Math.max(0, sheet.getLastRow() - 1);
-    try {
-      registerFile_(displayName, sheetName,
-        batchIndex === 0 ? headers : null,
-        (batchIndex === 0 && rows.length) ? rows[0] : null,
-        totalNow);
-    } catch (e) {}
+    // v23: daftar fail hanya pada batch pertama atau terakhir — bukan setiap batch.
+    if (batchIndex === 0 || req.isLastBatch === true || req.isLastBatch === 'true') {
+      try {
+        registerFile_(displayName, sheetName,
+          batchIndex === 0 ? headers : null,
+          (batchIndex === 0 && rows.length) ? rows[0] : null,
+          totalNow);
+      } catch (e) {}
+    }
 
     return {
       status: 'success',

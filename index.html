@@ -2,7 +2,7 @@
 <html lang="ms">
 <head>
   <meta charset="UTF-8" />
-  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbwYZ94xbe9A9F0xcV3sPkpnqWIuHyeJoyGWz0v-TCffq9qUGD1McEhe6CSBIPjwy1EeRw/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
+  <script>window.GAS_URL = 'https://script.google.com/macros/s/AKfycbxETiJq_X5aHOvBTvkb7S52QRoF5Ot6od1AxdDopBCcY3PKcmBRGe6AAq-xEKe_8m8t_w/exec'; /* URL Web App Google Apps Script (KEKAL untuk semua pengguna) */</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -415,7 +415,7 @@
     .adv-cond-incomplete { border: 1.5px dashed #f59e0b !important; border-radius: 12px; padding: 6px; background: #fffbeb; }
     .adv-cols > summary { list-style: none; cursor: pointer; }
     .adv-cols > summary::-webkit-details-marker { display: none; }
-    .adv-cols-panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; width: 320px; max-width: 86vw; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 18px 40px rgba(15,23,42,.18); padding: 10px; }
+    .adv-cols-panel { position: fixed; z-index: 60; width: 320px; max-width: calc(100vw - 16px); background: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 18px 40px rgba(15,23,42,.18); padding: 10px; }
     .adv-cols-list { max-height: 260px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: 8px; padding: 4px; margin: 6px 0; }
     .adv-cols-list label { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; font-size: 0.82rem; }
     .adv-cols-list label:hover { background: #f1f5f9; }
@@ -1166,9 +1166,10 @@
         <p style="font-size:0.87rem; color:var(--text-sub);">
           Hanya ada <strong>satu butang muat naik</strong>. Apa-apa fail Excel pun boleh — Murid, Guru, AKP, Kehadiran, Kokurikulum dan lain-lain.
           Taip <strong>Nama Fail</strong>, pilih cara simpan (Sheet Baharu / Ganti / Sambung ke Bawah), pilih fail, kemudian tekan <strong>Muat Naik Fail Ini</strong>. Data dihantar secara berperingkat
-          (<em>batch upload</em> 500 baris setiap pusingan) supaya stabil walaupun fail bersaiz besar.
+          (<em>batch upload</em> 2,000 baris setiap pusingan) supaya stabil walaupun fail bersaiz besar.
           Jika fail ada kolum <strong>KODSEKOLAH</strong>, fail itu boleh dicari ikut sekolah di Dashboard. Jika tiada, fail tetap disimpan dan disenaraikan di bawah.
         </p>
+        <div style="font-size:.82rem; background:#eff6ff; border:1px solid #93c5fd; border-radius:10px; padding:8px 12px; margin-top:8px;">⚡ <strong>Fail sangat besar (puluhan ribu baris)?</strong> Cara paling pantas: buka Google Sheet ini terus, <strong>Fail &gt; Import &gt; Muat naik fail Excel</strong>, pilih <strong>Ganti helaian semasa</strong> pada tab <strong>DATA_MURID / DATA_GURU / DATA_AKP</strong> (atau namakan tab baharu sebagai <strong>DATA_&lt;NAMA&gt;</strong>), kemudian tekan <strong>Segar Senarai Fail</strong> di bawah — fail akan muncul dalam app tanpa perlu menunggu batch.</div>
         <div style="margin-top:14px; display:flex; flex-direction:column; gap:10px; align-items:flex-start;">
           <span class="field-label" style="margin:0;">3. Pilih cara simpan fail ini:</span>
           <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.88rem; font-weight:700; cursor:pointer; background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:10px 12px; width:100%;">
@@ -1307,7 +1308,7 @@
     const DEFAULT_GAS_URL = String(window.GAS_URL || '').trim();
     // Buang URL lama yang pernah disimpan dalam pelayar supaya tidak mengatasi URL kekal
     try { localStorage.removeItem('ds_gas_url'); } catch (e) {}
-    const BATCH_UPLOAD_SIZE = 500;
+    const BATCH_UPLOAD_SIZE = 2000; // v23: 500 -> 2,000 baris setiap batch (4x kurang panggilan)
 
     // Kolum lalai yang dicadangkan mengikut fail sebenar anda
     const DEFAULT_COLS = {
@@ -2762,6 +2763,7 @@
       let lastRun = null;
       let list = null; // { cat, headers, rows, count, total, truncated, sortIdx, asc, page, pageSize }
       let pendingCols = null; // v19: draf tick pemilih Kolum yang belum diguna
+      let colsPanelListenersOn = false; // v22: pendengar resize/scroll panel Kolum
       let pendingColsCat = null; // fail yang draf itu untuknya
       adv.listCols = adv.listCols || {};
       adv.listLimit = adv.listLimit || 5000;
@@ -3142,8 +3144,46 @@
             note.style.fontWeight = same ? '' : '700';
           }
         }));
+        // v22: panel Kolum sebelum ini `position:absolute; right:0` — ia
+        // ditolak 320px ke KIRI butang. Bila butang dekat tepi kiri skrin
+        // (atau di telefon), panel terpotong di kiri dan sukar dibaca.
+        // Sekarang panel `position:fixed` dan kedudukannya dikira daripada
+        // kedudukan butang, dikekang supaya sentiasa dalam skrin.
+        const positionColsPanel = (details) => {
+          const panel = details.querySelector('.adv-cols-panel');
+          const sum = details.querySelector('summary');
+          if (!panel || !sum) return;
+          const r = sum.getBoundingClientRect();
+          const w = Math.min(320, window.innerWidth - 16);
+          const left = Math.min(Math.max(r.left, 8), Math.max(8, window.innerWidth - w - 8));
+          panel.style.width = w + 'px';
+          panel.style.left = left + 'px';
+          const below = window.innerHeight - r.bottom - 6;
+          if (below >= 220) { // muat di bawah butang
+            panel.style.top = (r.bottom + 6) + 'px';
+            panel.style.bottom = 'auto';
+            panel.style.maxHeight = Math.max(200, below - 10) + 'px';
+          } else { // butang dekat bawah skrin — buka ke atas
+            panel.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+            panel.style.top = 'auto';
+            panel.style.maxHeight = Math.max(200, r.top - 16) + 'px';
+          }
+          panel.style.overflowY = 'auto';
+        };
+        if (!colsPanelListenersOn) {
+          colsPanelListenersOn = true;
+          window.addEventListener('resize', () => { const d = document.querySelector('.adv-cols[open]'); if (d) positionColsPanel(d); });
+          window.addEventListener('scroll', (e) => {
+            const d = document.querySelector('.adv-cols[open]');
+            if (!d) return;
+            const panel = d.querySelector('.adv-cols-panel');
+            if (panel && panel.contains(e.target)) return; // scroll dalam panel sendiri — biarkan
+            d.open = false; // tutup bila halaman/jadual discroll — panel tidak lagi sejajar butang
+          }, true);
+        }
         q('.adv-cols').addEventListener('toggle', e => {
-          if (!e.target.open && pendingCols && JSON.stringify(pendingCols) !== JSON.stringify(list.headers)) applyPickedCols();
+          if (e.target.open) positionColsPanel(e.target);
+          else if (pendingCols && JSON.stringify(pendingCols) !== JSON.stringify(list.headers)) applyPickedCols();
         });
         q('[data-advcol-default]').addEventListener('click', () => { pendingCols = null; pendingColsCat = null; delete adv.listCols[list.cat]; save(); loadList(list.cat); });
         q('[data-advcol-apply]').addEventListener('click', applyPickedCols);
@@ -3633,7 +3673,7 @@
       btn.disabled = true;
       const old = btn.textContent;
       btn.textContent = '⏳ Menyegar...';
-      const ok = await loadFiles();
+      const ok = await loadFiles(true);
       btn.disabled = false;
       btn.textContent = old;
       showToast(ok ? 'Senarai fail telah disegarkan.' : 'Gagal menyegar senarai fail. Cuba lagi sebentar lagi.', !ok);
@@ -3683,12 +3723,20 @@
       btn.disabled = true;
       const totalRows = parsed.rows.length;
       const totalBatches = Math.ceil(totalRows / BATCH_UPLOAD_SIZE);
+      const uploadT0 = Date.now(); // v23: anggaran masa siap
       let savedSheet = targetSheetName;
       let savedName = finalDisplayName;
       try {
         for (let b = 0; b < totalBatches; b++) {
           const chunk = parsed.rows.slice(b * BATCH_UPLOAD_SIZE, (b + 1) * BATCH_UPLOAD_SIZE);
-          progTxt.textContent = `Menghantar batch ${b + 1} / ${totalBatches} (${Math.min((b + 1) * BATCH_UPLOAD_SIZE, totalRows).toLocaleString()} baris)...`;
+          let etaTxt = '';
+          const elapsedS = (Date.now() - uploadT0) / 1000;
+          const sentSoFar = b * BATCH_UPLOAD_SIZE;
+          if (b > 0 && elapsedS > 0 && sentSoFar > 0) {
+            const eta = Math.ceil((totalRows - sentSoFar) / (sentSoFar / elapsedS));
+            if (eta > 0) etaTxt = ` • lebih kurang ${eta}s lagi`;
+          }
+          progTxt.textContent = `Menghantar batch ${b + 1} / ${totalBatches} (${Math.min((b + 1) * BATCH_UPLOAD_SIZE, totalRows).toLocaleString()} baris)...${etaTxt}`;
           const payload = {
             action: 'uploadFileBatch',
             fileName: fileName,
@@ -3696,7 +3744,8 @@
             batchIndex: b,
             headers: parsed.headers,
             rows: chunk,
-            totalRows: totalRows
+            totalRows: totalRows,
+            isLastBatch: b === totalBatches - 1
           };
           if (mode === 'new') payload.targetSheetName = targetSheetName;
           const up = await callGAS(payload);
@@ -3724,11 +3773,14 @@
 
     /* ---------- Senarai fail kekal (dari Google Sheet) ---------- */
     let filesLoadTimer = null;
-    async function loadFiles() {
+    async function loadFiles(verify = false) {
       state.filesLoading = true;
       renderFileList();
       try {
-        const res = await callGAS({ action: 'listFiles' });
+        // v23: verify=true (butang Segar) semak kiraan sebenar setiap fail
+        // dari Google Sheet — penting selepas fail diimport terus dalam
+        // Sheet (Fail > Import), supaya kiraan yang dipaparkan tepat.
+        const res = await callGAS({ action: 'listFiles', verify: !!verify });
         state.files = Array.isArray(res.files) ? res.files : [];
         if (Array.isArray(res.files)) { state.filesLoaded = true; state.filesStale = false; saveCachedFiles(state.files); }
         renderFileList();
@@ -3738,7 +3790,7 @@
         // terakhir dan cuba semula sekali secara automatik (tanpa refresh).
         renderFileList();
         if (!loadFiles._retryTimer) {
-          loadFiles._retryTimer = setTimeout(() => { loadFiles._retryTimer = null; loadFiles(); }, 4000);
+          loadFiles._retryTimer = setTimeout(() => { loadFiles._retryTimer = null; loadFiles(verify); }, 4000);
         }
         return false;
       } finally {
